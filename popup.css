@@ -23,6 +23,12 @@ header {
     margin-bottom: 10px;
 }
 
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .title {
     display: flex;
     align-items: center;
@@ -56,6 +62,57 @@ h1 {
 .settings-button:hover {
     background-color: rgba(24, 119, 242, 0.1);
     color: #1877f2;
+}
+
+.language-icon-container {
+    position: relative;
+}
+
+.language-button {
+    width: auto;
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 8px;
+    color: #1877f2;
+    transition: all 0.2s ease;
+    border-radius: 50%;
+}
+
+.language-button:hover {
+    background-color: rgba(24, 119, 242, 0.1);
+    color: #1877f2;
+}
+
+.language-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 150px;
+    z-index: 100;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    display: none;
+}
+
+.language-icon-container:hover .language-dropdown {
+    display: block;
+}
+
+.language-dropdown select {
+    width: 100%;
+    border: none;
+    outline: none;
+    padding: 10px;
+    background-color: white;
+    cursor: pointer;
+}
+
+.language-dropdown select option {
+    padding: 8px;
 }
 
 .text-icon {

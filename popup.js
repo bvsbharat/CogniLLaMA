@@ -507,12 +507,19 @@ document.addEventListener('DOMContentLoaded', function() {
     restoreButton.textContent = 'Restore Original';
     restoreButton.style.marginTop = '10px';
     
-    // Add click event listener
-    restoreButton.addEventListener('click', function() {
+    // Function to handle restore action
+    function handleRestore(buttonElement) {
         // Update button state to show loading with animation
-        const originalText = restoreButton.textContent;
-        animateTextReplacement(restoreButton, 'Restoring...');
-        restoreButton.disabled = true;
+        const isIconButton = buttonElement.id === 'restore-icon-button';
+        const originalText = isIconButton ? '' : buttonElement.textContent;
+        const originalHTML = isIconButton ? buttonElement.innerHTML : '';
+        
+        if (isIconButton) {
+            buttonElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        } else {
+            animateTextReplacement(buttonElement, 'Restoring...');
+        }
+        buttonElement.disabled = true;
         
         // Send message to content script to restore original content
         chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
@@ -520,8 +527,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 chrome.tabs.sendMessage(tabs[0].id, {action: "restoreOriginalContent"}, function(response) {
                     // Reset button state with animation
                     setTimeout(() => {
-                        animateTextReplacement(restoreButton, originalText);
-                        restoreButton.disabled = false;
+                        if (isIconButton) {
+                            buttonElement.innerHTML = originalHTML;
+                        } else {
+                            animateTextReplacement(buttonElement, originalText);
+                        }
+                        buttonElement.disabled = false;
                     }, 500);
                     
                     if (response && response.success) {
@@ -536,6 +547,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         });
+    }
+    
+    // Add click event listener to the original restore button
+    restoreButton.addEventListener('click', function() {
+        handleRestore(this);
+    });
+    
+    // Add click event listener to the restore icon button in the header
+    document.getElementById('restore-icon-button').addEventListener('click', function() {
+        handleRestore(this);
     });
     
     // Add the restore button to the popup

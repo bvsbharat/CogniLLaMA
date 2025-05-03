@@ -41,9 +41,31 @@
                     <img src="images/icon48.png" alt="Cogni Icon" class="cogni-icon">
                     <h1>Cogni-llama</h1>
                 </div>
-                <button class="settings-button" aria-label="Settings">
-                    <i class="fas fa-cog"></i>
-                </button>
+                <div class="header-controls">
+                    <div class="language-icon-container">
+                        <button class="language-button" aria-label="Language">
+                            <i class="fas fa-language"></i>
+                        </button>
+                        <div class="language-dropdown">
+                            <select id="languageSelector">
+                                <option value="original">Original</option>
+                                <option value="en">English</option>
+                                <option value="es">Spanish</option>
+                                <option value="fr">French</option>
+                                <option value="de">German</option>
+                                <option value="it">Italian</option>
+                                <option value="pt">Portuguese</option>
+                                <option value="ru">Russian</option>
+                                <option value="zh">Chinese</option>
+                                <option value="ja">Japanese</option>
+                                <option value="hi">Hindi</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="settings-button" aria-label="Settings">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
             </header>
          
             <div class="optimization-mode">
@@ -54,15 +76,15 @@
                 <div class="optimization-options">
                     <div class="option-card" data-value="textClarity">
                         <i class="fa-solid fa-lightbulb"></i>
-                        <span>Simplify Complex Ideas</span>
+                        <span>Mind Illuminator</span>
                     </div>
                     <div class="option-card selected" data-value="focusStructure">
                         <i class="fa-solid fa-eye"></i>
-                        <span>Better Visual Organization</span>
+                        <span>Visual Symphony</span>
                     </div>
                     <div class="option-card" data-value="wordPattern">
                         <i class="fa-solid fa-book-open"></i>
-                        <span>Easier Reading Flow</span>
+                        <span>Flow Maestro</span>
                     </div>
                 </div>
                 <div id="optimizeGuide" class="optimize-guide">
@@ -70,21 +92,21 @@
                         <li>
                             <i class="fa-solid fa-lightbulb"></i>
                             <div>
-                                <strong>Simplify Complex Ideas</strong>
+                                <strong>Mind Illuminator</strong>
                                 <span>- Breaks down difficult concepts</span>
                             </div>
                         </li>
                         <li>
                             <i class="fa-solid fa-eye"></i>
                             <div>
-                                <strong>Better Visual Organization</strong>
+                                <strong>Visual Symphony</strong>
                                 <span>- Uses shorter sections and highlights</span>
                             </div>
                         </li>
                         <li>
                             <i class="fa-solid fa-book-open"></i>
                             <div>
-                                <strong>Easier Reading Flow</strong>
+                                <strong>Flow Maestro</strong>
                                 <span>- Makes text more predictable to read</span>
                             </div>
                         </li>
@@ -93,26 +115,11 @@
             </div>
 
             <!-- Language Selection Section -->
-            <div class="language-selection">
+            <div class="language-selection" style="display: none;">
                 <h2 class="section-title">
                     Target Language
                     <i id="helpIconLanguage" class="fa-solid fa-circle-question help-icon" aria-expanded="false"></i>
                 </h2>
-                <div class="dropdown-container">
-                    <select id="languageSelector">
-                        <option value="original">Original (No Translation)</option>
-                        <option value="en">English</option>
-                        <option value="es">Spanish</option>
-                        <option value="fr">French</option>
-                        <option value="de">German</option>
-                        <option value="it">Italian</option>
-                        <option value="pt">Portuguese</option>
-                        <option value="ru">Russian</option>
-                        <option value="zh">Chinese</option>
-                        <option value="ja">Japanese</option>
-                        <option value="hi">Hindi</option>
-                    </select>
-                </div>
                 <div id="languageGuide" class="language-guide">
                     <p class="helper-text">Choose the language for translation and simplification</p>
                     <ul>
