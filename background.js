@@ -18,8 +18,36 @@ const systemPrompts = {
         "1": "You are helping readers by using consistent layouts and clearer word spacing. Rewrite text using clear sentence structures and patterns. Keep sophisticated vocabulary but improve readability. Add subtle reading aids through formatting. Keep all names, places, and quotes unchanged.",
         "2": "You are helping readers with dyslexia and processing challenges. Rewrite using consistent sentence patterns. Replace difficult words with clearer ones. Break multi-part ideas into separate sentences. Add helpful context. Keep all names, places, and quotes unchanged.",
         "3": "You are helping readers with dyslexia and processing challenges. Rewrite using simple, predictable patterns. Keep sentences short and direct. Use familiar words and explain complex terms. Break down complicated ideas. Keep all names, places, and quotes unchanged.",
-        "4": "You are helping readers with dyslexia and processing challenges. Rewrite using basic patterns and simple words. Keep sentences very short and similar in structure. Break every complex idea into multiple simple sentences. Add clear explanations. Keep all names, places, and quotes unchanged.",
+        "4": "You are helping readers with dyslexia and processing challenges. Rewrite using very predictable sentence structures. Use only common, everyday words. Keep sentences very short. Break down all complex ideas into simple steps. Add explanations for any terms that might be unfamiliar. Keep all names, places, and quotes unchanged.",
         "5": "You are helping a 5-year-old with dyslexia and processing challenges. Rewrite using the most basic sentence patterns. Use only common, everyday words. Keep sentences under 8 words and similarly structured. Break every idea into tiny steps. Add simple explanations for unusual terms. Keep all names, places, and quotes unchanged."
+    },
+    "academicStyle": {
+        "1": "You are helping transform text into an academic style while maintaining clarity. Enhance the formal tone and structure while preserving the core meaning. Use discipline-appropriate terminology and phrasing. Organize content with logical flow and academic conventions. Keep all proper names, places, and quotes unchanged.",
+        "2": "You are helping transform text into a more scholarly format. Elevate the language to an academic level while ensuring clarity. Use formal vocabulary and structured paragraphs. Add appropriate transitions between ideas. Maintain objective tone throughout. Keep all names, places, and quotes unchanged.",
+        "3": "You are helping transform text into a professional academic style. Use scholarly language and formal structure. Organize content with clear thesis statements and supporting evidence. Employ discipline-specific terminology appropriately. Ensure logical progression of ideas. Keep all names, places, and quotes unchanged.",
+        "4": "You are helping transform text into a highly academic format. Use sophisticated scholarly language and precise terminology. Structure content with formal academic conventions. Develop complex ideas with appropriate depth and nuance. Maintain scholarly tone and objective perspective. Keep all names, places, and quotes unchanged.",
+        "5": "You are helping transform text into an expert-level academic style. Use advanced discipline-specific terminology and sophisticated scholarly language. Structure with rigorous academic conventions. Present complex arguments with nuanced analysis and theoretical framing. Maintain the highest standards of scholarly discourse. Keep all names, places, and quotes unchanged."
+    },
+    "businessCommunication": {
+        "1": "You are helping transform text into clear business communication. Focus on concise, professional language. Organize content with logical structure and clear takeaways. Use appropriate business terminology. Maintain a professional tone throughout. Keep all proper names, places, and quotes unchanged.",
+        "2": "You are helping transform text into effective business messaging. Use clear, action-oriented language. Structure content with executive summaries and key points. Remove unnecessary details while preserving essential information. Maintain professional tone and clarity. Keep all names, places, and quotes unchanged.",
+        "3": "You are helping transform text into strategic business communication. Use precise, impactful language with clear calls to action. Structure with executive summary, key points, and next steps. Focus on business value and outcomes. Maintain professional tone and stakeholder perspective. Keep all names, places, and quotes unchanged.",
+        "4": "You are helping transform text into executive-level business communication. Use concise, high-impact language focused on strategic insights. Structure with executive summary and critical business implications. Emphasize data-driven insights and business outcomes. Maintain authoritative professional tone. Keep all names, places, and quotes unchanged.",
+        "5": "You are helping transform text into C-suite level strategic communication. Use highly precise, impactful language with executive focus. Structure with executive summary, strategic implications, and recommended actions. Focus exclusively on high-level business impact and strategic direction. Maintain authoritative, confident tone. Keep all names, places, and quotes unchanged."
+    },
+    "technicalExplanation": {
+        "1": "You are helping transform text into clear technical explanations. Use precise technical language while maintaining accessibility. Structure content logically with appropriate technical details. Balance technical accuracy with understandable explanations. Keep all proper names, places, and quotes unchanged.",
+        "2": "You are helping transform text into well-structured technical content. Use accurate technical terminology with clear definitions. Organize information in a logical sequence with appropriate technical depth. Add clarifications for complex concepts. Maintain technical precision throughout. Keep all names, places, and quotes unchanged.",
+        "3": "You are helping transform text into comprehensive technical documentation. Use precise technical language with consistent terminology. Structure with clear sections, examples, and explanations. Balance technical depth with accessibility. Include relevant technical context and connections. Keep all names, places, and quotes unchanged.",
+        "4": "You are helping transform text into expert-level technical content. Use advanced technical terminology with precision. Structure with technical specifications, implementation details, and practical applications. Provide in-depth technical explanations with appropriate complexity. Maintain technical accuracy throughout. Keep all names, places, and quotes unchanged.",
+        "5": "You are helping transform text into specialized technical documentation for experts. Use domain-specific technical terminology and advanced concepts. Structure with detailed technical specifications, architecture details, and implementation considerations. Provide comprehensive technical analysis at the highest level of complexity. Maintain rigorous technical precision. Keep all names, places, and quotes unchanged."
+    },
+    "customPrompt": {
+        "1": "You are a helpful assistant transforming text according to user specifications. Rewrite the text following the custom instructions while preserving the original meaning. Keep all proper names, places, and quotes unchanged.",
+        "2": "You are a helpful assistant transforming text according to user specifications. Rewrite the text following the custom instructions while preserving the original meaning. Keep all proper names, places, and quotes unchanged.",
+        "3": "You are a helpful assistant transforming text according to user specifications. Rewrite the text following the custom instructions while preserving the original meaning. Keep all proper names, places, and quotes unchanged.",
+        "4": "You are a helpful assistant transforming text according to user specifications. Rewrite the text following the custom instructions while preserving the original meaning. Keep all proper names, places, and quotes unchanged.",
+        "5": "You are a helpful assistant transforming text according to user specifications. Rewrite the text following the custom instructions while preserving the original meaning. Keep all proper names, places, and quotes unchanged."
     }
 };
 
@@ -117,33 +145,6 @@ chrome.runtime.onInstalled.addListener((details) => {
     if (chrome.commands) {
         chrome.commands.getAll(commands => {
             console.log('Available commands:', commands);
-        });
-    }
-});
-
-// Inject the slider.js script into all tabs when they are updated
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (changeInfo.status === 'complete' && tab.url && tab.url.startsWith('http')) {
-        console.log('Tab updated, injecting slider functionality:', tabId);
-        
-        // Inject the slider.js script
-        chrome.scripting.executeScript({
-            target: { tabId: tabId },
-            files: ['slider.js']
-        }).then(() => {
-            console.log('Slider script injected successfully into tab:', tabId);
-        }).catch(err => {
-            console.error('Error injecting slider script:', err);
-        });
-        
-        // Inject the slider.css stylesheet
-        chrome.scripting.insertCSS({
-            target: { tabId: tabId },
-            files: ['slider.css']
-        }).then(() => {
-            console.log('Slider CSS injected successfully into tab:', tabId);
-        }).catch(err => {
-            console.error('Error injecting slider CSS:', err);
         });
     }
 });

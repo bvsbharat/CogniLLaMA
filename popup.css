@@ -224,6 +224,7 @@ button:hover {
 }
 
 .option-card {
+    position: relative;
     display: flex;
     align-items: center;
     padding: 12px;
@@ -254,6 +255,22 @@ button:hover {
 
 .option-card span {
     font-weight: 500;
+}
+
+.edit-icon {
+    position: absolute;
+    right: 5px;
+    top: 5px;
+    color: #1877f2;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 3px;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+}
+
+.edit-icon:hover {
+    background-color: rgba(24, 119, 242, 0.1);
 }
 
 /* Loader Animation */
@@ -452,6 +469,59 @@ input[type="range"]::-webkit-slider-thumb {
     cursor: pointer;
     border: 2px solid #fff;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.hidden {
+    visibility: hidden;
+    height: 0;
+    overflow: hidden;
+}
+
+/* Custom Prompt Area Styles */
+.custom-prompt-area {
+    margin-top: 15px;
+    transition: all 0.3s ease;
+}
+
+.custom-prompt-area.hidden {
+    visibility: hidden;
+    height: 0;
+    overflow: hidden;
+    margin: 0;
+}
+
+.custom-prompt-area textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #dddfe2;
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+}
+
+.custom-prompt-area textarea:focus {
+    border-color: #1877f2;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(24, 119, 242, 0.2);
+}
+
+.custom-prompt-area button {
+    background-color: #1877f2;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.custom-prompt-area button:hover {
+    background-color: #166fe5;
 }
 
 /* Helper guide styles */

@@ -138,24 +138,74 @@ simplifyButton.addEventListener('click', function() {
 
 // Function to initialize simplification slider
 function initializeSimplificationSlider() {
+    // Add ripple effect to simplification slider
     const slider = document.getElementById('simplificationSlider');
-    if (!slider) {
-        console.error('Simplification slider element not found');
-        return;
-    }
     
-    // Set default value if not already set
-    if (!slider.value) {
-        slider.value = '3'; // Default to '3' for "Mid"
-    }
-    
-    // Add event listener for slider changes
-    slider.addEventListener('input', function() {
-        // Add ripple effect for feedback
-        addRippleEffect(this);
+    // Initialize option cards
+    const optionCards = document.querySelectorAll('.option-card');
+    optionCards.forEach(card => {
+        // Add ripple effect to each card
+        addRippleEffect(card);
         
-        // Save the selected level
+        // Add click event to select the card
+        card.addEventListener('click', function() {
+            // Remove selected class from all cards
+            optionCards.forEach(c => c.classList.remove('selected'));
+            
+            // Add selected class to clicked card
+            this.classList.add('selected');
+            
+            // Get the selected value
+            const selectedValue = this.getAttribute('data-value');
+            
+            // Save the selected value
+            chrome.storage.sync.set({ optimizeFor: selectedValue });
+            
+            // Show/hide custom prompt area based on selection
+            const customPromptArea = document.getElementById('customPromptArea');
+            if (selectedValue === 'customPrompt') {
+                // Don't automatically show the custom prompt area when Custom Mode is selected
+                // The user will need to click the edit button to show it
+                // Load saved custom prompt if available for when they do open it
+                chrome.storage.sync.get(['customPromptText'], function(result) {
+                    if (result.customPromptText) {
+                        document.getElementById('customPromptInput').value = result.customPromptText;
+                    }
+                });
+            } else {
+                customPromptArea.classList.add('hidden');
+            }
+            
+            // Notify content script of the change
+            notifyConfigChange(true);
+        });
+    });
+    
+    // Initialize custom prompt save button
+    const saveCustomPromptButton = document.getElementById('saveCustomPrompt');
+    console.log('Save Custom Prompt button found:', saveCustomPromptButton ? 'Yes' : 'No');
+    
+    // Initialize custom prompt area visibility based on current selection
+    chrome.storage.sync.get(['optimizeFor', 'customPromptText'], function(result) {
+        const optimizeFor = result.optimizeFor || 'focusStructure';
+        const customPromptArea = document.getElementById('customPromptArea');
+        
+        // Always keep the custom prompt area hidden by default
+        // The user will need to click the edit button to show it
+        customPromptArea.classList.add('hidden');
+        
+        // Load the custom prompt text if available
+        if (result.customPromptText) {
+            document.getElementById('customPromptInput').value = result.customPromptText;
+        }
+    });
+    
+    // Add event listener to slider
+    slider.addEventListener('input', function() {
+        // Update the simplification level in storage
         chrome.storage.sync.set({ simplificationLevel: this.value });
+        
+        // Notify content script of the change
         notifyConfigChange(true);
     });
 }
@@ -184,15 +234,18 @@ function addRippleEffect(element) {
 function notifyConfigChange(isSimplificationChange = false) {
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
         if (tabs[0]) {
-            chrome.tabs.sendMessage(tabs[0].id, {
-                action: "updateConfig",
-                config: {
-                    simplificationLevel: document.getElementById('simplificationSlider').value,
-                    optimizeFor: document.querySelector('.option-card.selected').getAttribute('data-value'),
-                    fontEnabled: document.getElementById('fontToggle').checked,
-                    selectedLanguage: document.getElementById('languageSelector').value
-                },
-                isSimplificationChange: isSimplificationChange
+            chrome.storage.sync.get(['customPromptText'], function(customResult) {
+                chrome.tabs.sendMessage(tabs[0].id, {
+                    action: "updateConfig",
+                    config: {
+                        simplificationLevel: document.getElementById('simplificationSlider').value,
+                        optimizeFor: document.querySelector('.option-card.selected').getAttribute('data-value'),
+                        fontEnabled: document.getElementById('fontToggle').checked,
+                        selectedLanguage: document.getElementById('languageSelector').value,
+                        customPromptText: customResult.customPromptText || ''
+                    },
+                    isSimplificationChange: isSimplificationChange
+                });
             });
         }
     });
@@ -265,7 +318,7 @@ document.addEventListener('DOMContentLoaded', function() {
         chrome.storage.sync.set({
             fontEnabled: false,
             selectedTheme: 'default',
-            lineSpacing: 1.5,
+            lineSpacing: 1,
             letterSpacing: 0,
             wordSpacing: 0
         }, function() {
@@ -554,14 +607,74 @@ document.addEventListener('DOMContentLoaded', function() {
         handleRestore(this);
     });
     
-    // Add click event listener to the restore icon button in the header
-    document.getElementById('restore-icon-button').addEventListener('click', function() {
-        handleRestore(this);
-    });
-    
     // Add the restore button to the popup
     document.getElementById('actionButtons').appendChild(restoreButton);
     
+    // Add event listener to the Save Custom Prompt button
+    const saveCustomPromptButton = document.getElementById('saveCustomPrompt');
+    if (saveCustomPromptButton) {
+        saveCustomPromptButton.addEventListener('click', function() {
+            const customPromptText = document.getElementById('customPromptInput').value;
+            console.log('Custom prompt text to save:', customPromptText);
+            
+            // Save the custom prompt text
+            chrome.storage.sync.set({ customPromptText: customPromptText }, function() {
+                console.log('Custom prompt saved successfully');
+                
+                // Show notification
+                showNotification('Custom prompt saved!', 'success');
+                
+                // Notify content script of the change
+                notifyConfigChange(true);
+                
+                // Hide the custom prompt area after saving
+                const customPromptArea = document.getElementById('customPromptArea');
+                if (customPromptArea) {
+                    customPromptArea.classList.add('hidden');
+                    console.log('Custom prompt area hidden');
+                }
+                
+                // If custom mode is not selected, select it
+                const customModeCard = document.querySelector('.option-card[data-value="customPrompt"]');
+                if (customModeCard && !customModeCard.classList.contains('selected')) {
+                    // Remove selected class from all cards
+                    document.querySelectorAll('.option-card').forEach(card => {
+                        card.classList.remove('selected');
+                    });
+                    
+                    // Add selected class to custom mode card
+                    customModeCard.classList.add('selected');
+                    console.log('Custom mode selected');
+                    
+                    // Save the selection to storage
+                    chrome.storage.sync.set({ optimizeFor: 'customPrompt' });
+                }
+            });
+        });
+    }
+
+    // Add event listener to the Edit Custom Prompt button
+    const editCustomPromptButton = document.getElementById('editCustomPrompt');
+    if (editCustomPromptButton) {
+        editCustomPromptButton.addEventListener('click', function(event) {
+            // Prevent the click from propagating to the parent option card
+            event.stopPropagation();
+            
+            // Show the custom prompt area
+            const customPromptArea = document.getElementById('customPromptArea');
+            if (customPromptArea) {
+                customPromptArea.classList.remove('hidden');
+                
+                // Load saved custom prompt if available
+                chrome.storage.sync.get(['customPromptText'], function(result) {
+                    if (result.customPromptText) {
+                        document.getElementById('customPromptInput').value = result.customPromptText;
+                    }
+                });
+            }
+        });
+    }
+
     // Function to show notifications
     function showNotification(message, type) {
         const notification = document.createElement('div');
@@ -574,7 +687,18 @@ document.addEventListener('DOMContentLoaded', function() {
         notification.style.marginTop = '10px';
         notification.style.textAlign = 'center';
         
-        document.getElementById('actionButtons').appendChild(notification);
+        // Find a suitable container to append the notification
+        const actionButtons = document.getElementById('actionButtons');
+        const customPromptArea = document.getElementById('customPromptArea');
+        
+        if (actionButtons) {
+            actionButtons.appendChild(notification);
+        } else if (customPromptArea) {
+            customPromptArea.appendChild(notification);
+        } else {
+            // Fallback to appending to body if neither container exists
+            document.body.appendChild(notification);
+        }
         
         setTimeout(() => {
             notification.style.opacity = '0';

@@ -25,26 +25,26 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js", "slider.js"],
-      "css": ["content.css", "fonts.css", "slider.css"],
+      "js": ["config.js", "content.js"],
+      "css": ["content.css", "fonts.css"],
       "run_at": "document_end"
     }
   ],
-  "commands": {
-    "toggle-slider": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+L",
-        "mac": "Cmd+Shift+L"
-      },
-      "description": "Toggle the CogniLLaMA configuration slider"
-    }
-  },
   "options_page": "options.html",
   "background": {
     "service_worker": "background.js"
   },
   "web_accessible_resources": [{
-    "resources": ["fonts/*", "config.js", "popup.html", "popup.js", "popup.css", "slider.css", "images/*"],
+    "resources": ["fonts/*", "config.js", "slider.js", "popup.html", "popup.js", "popup.css", "slider.css", "images/*"],
     "matches": ["<all_urls>"]
-  }]
+  }],
+  "commands": {
+    "toggle-slider": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L",
+        "mac": "Command+Shift+L"
+      },
+      "description": "Toggle the CogniLLaMA configuration slider"
+    }
+  }
 }

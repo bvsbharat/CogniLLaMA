@@ -73,18 +73,27 @@ async function ensureInitialized() {
             
             // Get current settings
             const settings = await new Promise((resolve) => {
-                chrome.storage.sync.get(['simplificationLevel', 'optimizeFor', 'selectedLanguage'], (result) => {
+                chrome.storage.sync.get(['simplificationLevel', 'optimizeFor', 'selectedLanguage', 'customPromptText'], (result) => {
                     resolve({
                         level: result.simplificationLevel || '3',
                         optimizeFor: result.optimizeFor || 'textClarity',
-                        language: result.selectedLanguage || 'original'
+                        language: result.selectedLanguage || 'original',
+                        customPromptText: result.customPromptText || ''
                     });
                 });
             });
             
             // Set system prompt based on settings
-            systemPrompt = systemPrompts[settings.optimizeFor][settings.level];
-            console.log('System prompt set:', systemPrompt ? 'Success' : 'Failed');
+            if (settings.optimizeFor === 'customPrompt' && settings.customPromptText) {
+                // Use custom prompt if selected and available
+                systemPrompt = `You are a helpful assistant transforming text according to these instructions: ${settings.customPromptText}. Keep all proper names, places, and quotes unchanged.`;
+                console.log('Using custom prompt:', systemPrompt);
+                console.log('Custom prompt text:', settings.customPromptText);
+            } else {
+                // Use predefined system prompt
+                systemPrompt = systemPrompts[settings.optimizeFor][settings.level];
+                console.log('System prompt set:', systemPrompt ? 'Success' : 'Failed');
+            }
         }
         
         initialized = true;
@@ -505,11 +514,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         if (systemPrompts) {
                             // Get current settings
                             const settings = await new Promise((resolve) => {
-                                chrome.storage.sync.get(['simplificationLevel', 'optimizeFor', 'selectedLanguage'], (result) => {
+                                chrome.storage.sync.get(['simplificationLevel', 'optimizeFor', 'selectedLanguage', 'customPromptText'], (result) => {
                                     resolve({
                                         level: result.simplificationLevel || '3',
                                         optimizeFor: result.optimizeFor || 'textClarity',
-                                        language: result.selectedLanguage || 'original'
+                                        language: result.selectedLanguage || 'original',
+                                        customPromptText: result.customPromptText || ''
                                     });
                                 });
                             });
@@ -518,8 +528,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                             console.log("Selected language:", settings.language);
                             
                             // Update system prompt based on current settings
-                            systemPrompt = systemPrompts[settings.optimizeFor][settings.level];
-                            console.log("Updated system prompt:", systemPrompt ? "Success" : "Failed");
+                            if (settings.optimizeFor === 'customPrompt' && settings.customPromptText) {
+                                // Use custom prompt if selected and available
+                                systemPrompt = `You are a helpful assistant transforming text according to these instructions: ${settings.customPromptText}. Keep all proper names, places, and quotes unchanged.`;
+                                console.log('Using custom prompt:', systemPrompt);
+                                console.log('Custom prompt text:', settings.customPromptText);
+                            } else {
+                                // Use predefined system prompt
+                                systemPrompt = systemPrompts[settings.optimizeFor][settings.level];
+                                console.log("Updated system prompt:", systemPrompt ? "Success" : "Failed");
+                            }
                         }
                         
                         // Check if API key is set - use directly from config
@@ -823,11 +841,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         chrome.storage.sync.set({ selectedLanguage: request.config.selectedLanguage });
                     }
                     
+                    // Store the custom prompt text if provided
+                    if (request.config.customPromptText !== undefined) {
+                        console.log("Updating custom prompt text:", request.config.customPromptText);
+                        chrome.storage.sync.set({ customPromptText: request.config.customPromptText });
+                    }
+                    
                     // Re-simplify content with new configuration if requested
-                    if (request.reapply && simplifiedElements.length > 0) {
-                        console.log("Re-applying simplification with new configuration");
-                        // Trigger simplification again
-                        chrome.runtime.sendMessage({action: "simplify"});
+                    if (request.isSimplificationChange) {
+                        console.log("Configuration changed, will re-simplify content on next request");
+                        // Reset initialization flag to force reload of system prompts
+                        initialized = false;
                     }
                     sendResponse({success: true});
                     break;
