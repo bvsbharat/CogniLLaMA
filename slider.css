@@ -44,6 +44,10 @@
     --spacing-4: 1.5rem;
 }
 
+.html-header-message{
+    display: none;
+}
+
 .cogni-llama-slider {
     position: fixed;
     top: 0;
@@ -92,6 +96,48 @@
     }
     100% {
         left: -350px;
+        opacity: 0.7;
+    }
+}
+
+/* Right-side slider styles */
+.cogni-llama-slider.right-side {
+    left: auto;
+    right: -350px; /* Start off-screen on the right */
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-top-left-radius: var(--radius-lg);
+    border-bottom-left-radius: var(--radius-lg);
+}
+
+.cogni-llama-slider.right-side.visible {
+    right: 0;
+    animation: slideInFromRight 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes slideInFromRight {
+    0% {
+        right: -350px;
+        opacity: 0.7;
+    }
+    100% {
+        right: 0;
+        opacity: 1;
+    }
+}
+
+/* Animation for sliding out from right */
+.cogni-llama-slider.right-side:not(.visible) {
+    animation: slideOutToRight 0.3s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+}
+
+@keyframes slideOutToRight {
+    0% {
+        right: 0;
+        opacity: 1;
+    }
+    100% {
+        right: -350px;
         opacity: 0.7;
     }
 }
@@ -638,6 +684,28 @@
     display: inline;
     box-shadow: 0 0 3px rgba(0, 0, 0, 0.1);
     color: var(--neutral-black);
+}
+
+/* Animation for content replacement */
+@keyframes contentUpdated {
+    0% {
+        background-color: rgba(88, 178, 246, 0.2);
+        transform: scale(0.98);
+    }
+    50% {
+        background-color: rgba(88, 178, 246, 0.3);
+        transform: scale(1.01);
+    }
+    100% {
+        background-color: transparent;
+        transform: scale(1);
+    }
+}
+
+.cogni-llama-content-updated {
+    animation: contentUpdated 1.2s ease-in-out;
+    border-radius: 3px;
+    transition: all 0.3s ease;
 }
 
 /* Responsive adjustments for smaller screens */
