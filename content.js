@@ -144,7 +144,7 @@ async function ensureInitialized() {
                 chrome.storage.sync.get(['simplificationLevel', 'optimizeFor', 'selectedLanguage', 'customPromptText'], (result) => {
                     resolve({
                         level: result.simplificationLevel || '3',
-                        optimizeFor: result.optimizeFor || 'textClarity',
+                        optimizeFor: result.optimizeFor || 'customPrompt',
                         language: result.selectedLanguage || 'original',
                         customPromptText: result.customPromptText || ''
                     });
@@ -742,24 +742,29 @@ async function testAPI() {
 }
 
 // Function to simplify the content of the page
-async function simplifyContent(cognitiveMode = 'textClarity', targetLanguage = 'en', simplificationLevel = 3, customPrompt = '') {
-    console.log(`Starting content simplification with mode: ${cognitiveMode}, language: ${targetLanguage}, level: ${simplificationLevel}`);
+async function simplifyContent(cognitiveMode = 'customPrompt', targetLanguage = 'en', simplificationLevel = 3, customPrompt = '') {
     
+
+
     // Generate the appropriate system prompt based on cognitive mode
     let systemPrompt = '';
     
     // Define system prompts for different modes
     const systemPrompts = {
-        'textClarity': "You are a helpful assistant that simplifies text while maintaining clarity. Make complex concepts easier to understand.",
-        'visualSymphony': "You are a helpful assistant that transforms text to be more visually descriptive and engaging. Paint a picture with words.",
-        'flowMaestro': "You are a helpful assistant that improves the flow and readability of text. Make the content more cohesive and easier to follow.",
-        'academicStyle': "You are a helpful assistant that adapts text to follow academic writing standards. Make the content more formal and scholarly.",
-        'technicalExplanation': "You are a helpful assistant that explains technical concepts clearly. Break down complex ideas into understandable components.",
-        'customPrompt': customPrompt || "You are a helpful assistant that transforms text according to custom instructions while maintaining the core meaning."
+        'customPrompt': customPrompt || "You are a helpful assistant that transforms text according to custom instructions while maintaining the core meaning.",
+        'eli5Simplify': "You are a helpful assistant that explains complex concepts in extremely simple terms. Explain like I'm 5 years old, using simple language, examples, and analogies.",
+        'visualClarity': "You are a helpful assistant that transforms text to be more visually descriptive and engaging. Paint a picture with words to improve visual clarity.",
+        'mindIlluminator': "You are a helpful assistant that simplifies text while maintaining clarity. Make complex concepts easier to understand and illuminate key ideas.",
+        'techExplainer': "You are a helpful assistant that explains technical concepts clearly. Break down complex ideas into understandable components."
     };
     
+    let selectedCognitiveMode = await chrome.storage.sync.get('cognitiveMode');
+
     // Set the system prompt based on the selected cognitive mode
-    systemPrompt = systemPrompts[cognitiveMode] || systemPrompts['textClarity'];
+    systemPrompt = systemPrompts[selectedCognitiveMode.cognitiveMode] || systemPrompts['eli5Simplify'];
+
+    console.log("selectedCognitiveMode", selectedCognitiveMode.cognitiveMode);
+    console.log("systemPrompt", systemPrompt);
     
     // Adjust the prompt based on simplification level (1-5)
     let levelAdjustment = '';
@@ -1044,10 +1049,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         if (systemPrompts) {
                             // Get current settings
                             const settings = await new Promise((resolve) => {
-                                chrome.storage.sync.get(['simplificationLevel', 'optimizeFor', 'selectedLanguage', 'customPromptText'], (result) => {
+                                chrome.storage.sync.get(['simplificationLevel', 'cognitiveMode', 'selectedLanguage', 'customPromptText'], (result) => {
                                     resolve({
                                         level: result.simplificationLevel || '3',
-                                        optimizeFor: result.optimizeFor || 'textClarity',
+                                        cognitiveMode: result.cognitiveMode || 'customPrompt',
                                         language: result.selectedLanguage || 'original',
                                         customPromptText: result.customPromptText || ''
                                     });
@@ -1058,7 +1063,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                             console.log("Selected language:", settings.language);
                             
                             // Update system prompt based on current settings
-                            if (settings.optimizeFor === 'customPrompt' && settings.customPromptText) {
+                            if (settings.cognitiveMode === 'customPrompt' && settings.customPromptText) {
                                 // Use custom prompt if selected and available
                                 systemPrompt = `You are a helpful assistant transforming text according to these instructions: ${settings.customPromptText}. Keep all proper names, places, and quotes unchanged.`;
                                 console.log('Using custom prompt:', systemPrompt);
@@ -1081,7 +1086,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         }
 
                         // Use the new simplifyContent function
-                        const simplifiedCount = await simplifyContent();
+                        const simplifiedCount = await simplifyContent(
+                            settings.cognitiveMode,
+                            settings.language,
+                            parseInt(settings.level),
+                            settings.customPromptText
+                        );
                         sendResponse({success: true, count: simplifiedCount});
                     } catch (error) {
                         console.error('Error simplifying content:', error);
@@ -1510,39 +1520,39 @@ async function injectSlider() {
                         <div class="cogni-llama-section">
                             <h3><i class="fa-solid fa-brain"></i> Cognitive Mode</h3>
                             <div class="cogni-llama-option-cards">
-                                <div class="cogni-llama-option-card" data-value="textClarity">
-                                    <i class="fa-solid fa-lightbulb"></i>
-                                    <span>Mind Illuminator</span>
-                                </div>
-                                <div class="cogni-llama-option-card" data-value="visualSymphony">
-                                    <i class="fa-solid fa-eye"></i>
-                                    <span>Visual Symphony</span>
-                                </div>
-                                <div class="cogni-llama-option-card" data-value="flowMaestro">
-                                    <i class="fa-solid fa-book-open"></i>
-                                    <span>Flow Maestro</span>
-                                </div>
-                                <div class="cogni-llama-option-card" data-value="academicStyle">
-                                    <i class="fa-solid fa-graduation-cap"></i>
-                                    <span>Academic Scholar</span>
-                                </div>
-                                <div class="cogni-llama-option-card" data-value="technicalExplanation">
-                                    <i class="fa-solid fa-code"></i>
-                                    <span>Tech Explainer</span>
-                                </div>
-                                <div class="cogni-llama-option-card" data-value="customPrompt">
+                                  <div class="cogni-llama-option-card" data-value="customPrompt">
                                     <i class="fa-solid fa-wand-magic-sparkles"></i>
                                     <span>Custom Mode</span>
                                     <i class="fa-solid fa-pen-to-square cogni-llama-edit-icon" id="cogni-llama-edit-custom"></i>
                                 </div>
-                            </div>
-                            
-                            <div id="cogni-llama-custom-prompt-area" class="cogni-llama-custom-prompt-area hidden">
+                                
+                                <div id="cogni-llama-custom-prompt-area" class="cogni-llama-custom-prompt-area hidden">
                                 <textarea id="cogni-llama-custom-prompt-input" placeholder="Enter your custom instructions here. For example: 'Rewrite this text in the style of Shakespeare' or 'Explain this as if teaching to a high school student'"></textarea>
                                 <button id="cogni-llama-save-custom-prompt" class="cogni-llama-button cogni-llama-primary-button">
                                     <i class="fa-solid fa-save"></i> Save Custom Prompt
                                 </button>
                             </div>
+
+                                <div class="cogni-llama-option-card" data-value="eli5Simplify">
+                                    <i class="fa-solid fa-child"></i>
+                                    <span>ELI5 Simplify</span>
+                                </div>
+                                <div class="cogni-llama-option-card" data-value="visualClarity">
+                                    <i class="fa-solid fa-eye"></i>
+                                    <span>Visual Clarity</span>
+                                </div>
+                                <div class="cogni-llama-option-card" data-value="mindIlluminator">
+                                    <i class="fa-solid fa-lightbulb"></i>
+                                    <span>Mind Illuminator</span>
+                                </div>
+                                <div class="cogni-llama-option-card" data-value="techExplainer">
+                                    <i class="fa-solid fa-code"></i>
+                                    <span>Tech Explainer</span>
+                                </div>
+                              
+                            </div>
+                            
+                            
                         </div>
                         
                         <div class="cogni-llama-section">
@@ -2031,7 +2041,7 @@ function initializeSliderFunctionality() {
             
             // Reset settings in storage
             chrome.storage.sync.set({
-                cognitiveMode: 'textClarity',
+                cognitiveMode: 'customPrompt',
                 targetLanguage: 'en',
                 simplificationLevel: 3,
                 selectedTheme: 'default',
@@ -2049,7 +2059,7 @@ function initializeSliderFunctionality() {
             if (optionCards && optionCards.length > 0) {
                 optionCards.forEach(card => {
                     card.classList.remove('selected');
-                    if (card.getAttribute('data-value') === 'textClarity') {
+                    if (card.getAttribute('data-value') === 'customPrompt') {
                         card.classList.add('selected');
                     }
                 });
@@ -2101,7 +2111,7 @@ function initializeSliderFunctionality() {
         console.log("Loading saved settings:", result);
         
         // Initialize optimization mode
-        const optimizeFor = result.optimizeFor || 'focusStructure';
+        const optimizeFor = result.optimizeFor || 'customPrompt';
         optionCards.forEach(card => {
             if (card.getAttribute('data-value') === optimizeFor) {
                 card.classList.add('selected');
@@ -2226,7 +2236,7 @@ simplifyButton.addEventListener('click', function() {
     simplifyButton.disabled = true;
     
     // Get the selected cognitive mode
-    let cognitiveMode = 'textClarity'; // Default value
+    let cognitiveMode = 'customPrompt'; // Default value
     
     const selectedCard = document.querySelector('.cogni-llama-option-card.selected');
     if (selectedCard) {
