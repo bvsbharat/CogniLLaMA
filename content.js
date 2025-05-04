@@ -1,9 +1,77 @@
+// Function to find the main content element on the page
+function findMainContentElement() {
+    console.log('Finding main content element...');
+    
+    // Try common content container selectors in priority order
+    const contentSelectors = [
+        'article',
+        'main',
+        '.article',
+        '.post',
+        '.content',
+        '.main-content',
+        '.article-content',
+        '.post-content',
+        '#content',
+        '#main-content',
+        '[role="main"]',
+        '[itemprop="articleBody"]'
+    ];
+    
+    for (const selector of contentSelectors) {
+        const element = document.querySelector(selector);
+        if (element && element.textContent.trim().length > 200) {
+            console.log(`Found main content using selector: ${selector}`);
+            return element;
+        }
+    }
+    
+    // If no specific container is found, try to find the element with the most text
+    console.log('No common content container found, searching for element with most text...');
+    
+    const elements = document.querySelectorAll('div, section, article');
+    let bestElement = null;
+    let maxTextLength = 0;
+    
+    elements.forEach(element => {
+        // Skip elements that are likely navigation, sidebars, etc.
+        const isNavigation = element.tagName === 'NAV' || 
+                            element.id?.toLowerCase().includes('nav') || 
+                            element.className?.toLowerCase().includes('nav');
+                            
+        const isSidebar = element.id?.toLowerCase().includes('sidebar') || 
+                        element.className?.toLowerCase().includes('sidebar');
+                        
+        const isFooter = element.tagName === 'FOOTER' || 
+                        element.id?.toLowerCase().includes('footer') || 
+                        element.className?.toLowerCase().includes('footer');
+        
+        if (!isNavigation && !isSidebar && !isFooter) {
+            const textLength = element.textContent.trim().length;
+            if (textLength > maxTextLength && textLength > 200) {
+                maxTextLength = textLength;
+                bestElement = element;
+            }
+        }
+    });
+    
+    if (bestElement) {
+        console.log('Found main content using text length heuristic', bestElement);
+        return bestElement;
+    }
+    
+    // Fallback to document body if all else fails
+    console.log('Falling back to document body');
+    return document.body;
+}
+
 let promptSession = null;
 let systemPrompt = null; // Store systemPrompt globally
 let simplifiedElements = []; // Track simplified elements
 let hoverEnabled = false; // Track hover state
 let fontEnabled = false; // Track font state
 let initialized = false; // Track initialization state
+let sliderInjected = false; // Track if the slider has been injected
 
 // Theme definitions
 const themes = {
@@ -107,7 +175,14 @@ async function simplifyTextWithTogetherAI(textItems, systemPrompt, selectedLangu
     console.log('=== STARTING API CALL ===');
     console.log('Simplifying text with Together AI...');
     console.log('Number of text items:', textItems.length);
-    console.log('System prompt:', systemPrompt.substring(0, 50) + '...');
+    
+    // Fix the null systemprompt error by adding a null check
+    if (!systemPrompt) {
+        systemPrompt = "You are a helpful assistant that simplifies text while keeping the original meaning. Make the text easier to understand for general audiences.";
+        console.log('Using default system prompt');
+    } else {
+        console.log('System prompt:', systemPrompt.substring(0, 50) + '...');
+    }
     
     try {
         // Get API key directly from config
@@ -353,46 +428,82 @@ Example output:
         
         // Now that we have the raw text response, parse it
         if (rawResponse) {
-            // Parse the JSON response
-            try {
-                // Try to clean the response if needed - some models add markdown code blocks
-                let jsonString = rawResponse;
+            // Clean and sanitize the response before parsing
+            let jsonString = rawResponse;
+            
+            // Remove any markdown code block markers if present
+            if (rawResponse.includes('```json')) {
+                jsonString = rawResponse.replace(/```json\n?|\n?```/g, '');
+            } else if (rawResponse.includes('```')) {
+                jsonString = rawResponse.replace(/```\n?|\n?```/g, '');
+            }
+            
+            // Log the cleaned string for debugging
+            console.log('Cleaned JSON string:', jsonString.substring(0, 200) + '...');
+            
+            // Handle the case where the response is not in JSON format at all
+            // This happens when the API returns the simplified text directly without JSON structure
+            if (!jsonString.trim().startsWith('[') && !jsonString.trim().startsWith('{')) {
+                console.log('Response is not in JSON format, creating manual JSON structure');
                 
-                // Remove any markdown code block markers if present
-                if (rawResponse.includes('```json')) {
-                    jsonString = rawResponse.replace(/```json\n?|\n?```/g, '');
-                } else if (rawResponse.includes('```')) {
-                    jsonString = rawResponse.replace(/```\n?|\n?```/g, '');
+                // Create a custom map using the batch items and response directly
+                const simplificationMap = {};
+                
+                // If we have only one item in the batch, use the entire response as its simplified text
+                if (textItems.length === 1) {
+                    simplificationMap[`text_0`] = jsonString.trim();
+                    console.log('Created single-item simplification map');
+                    return simplificationMap;
                 }
                 
-                // Try direct parsing first (in case the response is already clean JSON)
-                try {
-                    const directParse = JSON.parse(jsonString);
-                    console.log('Direct JSON parsing succeeded:', directParse.length);
-                    
-                    // Create a map of id to simplified text
-                    const simplificationMap = {};
-                    directParse.forEach(item => {
-                        if (item.id && item.simplified) {
-                            simplificationMap[item.id] = item.simplified;
-                        } else {
-                            console.warn('Skipping item with missing id or simplified text:', item);
-                        }
-                    });
-                    
-                    console.log('Created simplification map with keys:', Object.keys(simplificationMap));
-                    console.log('=== API CALL COMPLETED SUCCESSFULLY ===');
+                // If we have multiple items but no JSON, try to split the response
+                // Based on paragraph breaks or other heuristics
+                const paragraphs = jsonString.split(/\n\s*\n/);
+                textItems.forEach((item, index) => {
+                    if (index < paragraphs.length) {
+                        simplificationMap[`text_${index}`] = paragraphs[index].trim();
+                    } else {
+                        // If we don't have enough paragraphs, just return the original text
+                        simplificationMap[`text_${index}`] = item.text;
+                    }
+                });
+                
+                if (Object.keys(simplificationMap).length > 0) {
+                    console.log('Created paragraph-based simplification map with keys:', Object.keys(simplificationMap));
+                    console.log('=== API CALL COMPLETED WITH FALLBACK PARSING ===');
                     return simplificationMap;
-                } catch (directError) {
-                    console.log('Direct parsing failed, trying to extract JSON array:', directError);
+                }
+            }
+            
+            // Try direct parsing first (in case the response is already clean JSON)
+            try {
+                const directParse = JSON.parse(jsonString);
+                console.log('Direct JSON parsing succeeded:', directParse.length);
+                
+                // Create a map of id to simplified text
+                const simplificationMap = {};
+                directParse.forEach(item => {
+                    if (item.id && item.simplified) {
+                        simplificationMap[item.id] = item.simplified;
+                    } else {
+                        console.warn('Skipping item with missing id or simplified text:', item);
+                    }
+                });
+                
+                console.log('Created simplification map with keys:', Object.keys(simplificationMap));
+                console.log('=== API CALL COMPLETED SUCCESSFULLY ===');
+                return simplificationMap;
+            } catch (directError) {
+                console.log('Direct parsing failed, trying to extract JSON array:', directError);
+                
+                // Try to find JSON array in the response (in case there's any extra text)
+                const jsonMatch = jsonString.match(/\[\s*\{\s*\"id\"[\s\S]*\}\s*\]/);
+                
+                // If JSON array is found, extract it and parse
+                if (jsonMatch) {
+                    console.log('Found JSON array in response:', jsonMatch[0].substring(0, 200) + '...');
                     
-                    // Find JSON array in the response (in case there's any extra text)
-                    const jsonMatch = jsonString.match(/\[\s*\{\s*\"id\"[\s\S]*\}\s*\]/);
-                    
-                    // If JSON array is found, extract it and parse
-                    if (jsonMatch) {
-                        console.log('Found JSON array in response:', jsonMatch[0].substring(0, 200) + '...');
-                        
+                    try {
                         const extractedJson = jsonMatch[0];
                         const simplifiedItems = JSON.parse(extractedJson);
                         console.log('Parsed simplified items:', simplifiedItems.length);
@@ -410,15 +521,65 @@ Example output:
                         console.log('Created simplification map with keys:', Object.keys(simplificationMap));
                         console.log('=== API CALL COMPLETED SUCCESSFULLY ===');
                         return simplificationMap;
-                    } else {
-                        console.error('Could not find JSON array in response');
-                        throw new Error('Could not find valid JSON array in API response');
+                    } catch (matchError) {
+                        console.error('Error parsing extracted JSON array:', matchError);
                     }
                 }
-            } catch (error) {
-                console.error('Error parsing JSON response:', error);
-                console.log('Raw response that failed to parse:', rawResponse);
-                throw new Error('Failed to parse JSON response from API: ' + error.message);
+                
+                // If we reach here, try a more aggressive JSON extraction
+                try {
+                    // Look for any JSON-like structure with id and simplified fields
+                    const looseMatch = jsonString.match(/\{[^{}]*"id"\s*:\s*"[^"]*"[^{}]*"simplified"\s*:\s*"[^"]*"[^{}]*\}/g);
+                    
+                    if (looseMatch && looseMatch.length > 0) {
+                        console.log('Found loose JSON objects:', looseMatch.length);
+                        
+                        // Try to reconstruct a valid JSON array
+                        const reconstructedJson = `[${looseMatch.join(',')}]`;
+                        console.log('Reconstructed JSON:', reconstructedJson.substring(0, 200) + '...');
+                        
+                        try {
+                            const simplifiedItems = JSON.parse(reconstructedJson);
+                            
+                            // Create a map of id to simplified text
+                            const simplificationMap = {};
+                            simplifiedItems.forEach(item => {
+                                if (item.id && item.simplified) {
+                                    simplificationMap[item.id] = item.simplified;
+                                }
+                            });
+                            
+                            if (Object.keys(simplificationMap).length > 0) {
+                                console.log('Created reconstructed simplification map with keys:', Object.keys(simplificationMap));
+                                console.log('=== API CALL COMPLETED WITH RECONSTRUCTED JSON ===');
+                                return simplificationMap;
+                            }
+                        } catch (reconstructError) {
+                            console.error('Error parsing reconstructed JSON:', reconstructError);
+                        }
+                    }
+                } catch (looseError) {
+                    console.error('Error during loose JSON matching:', looseError);
+                }
+                
+                // Final fallback: just return the text as is
+                console.log('All JSON parsing methods failed, using fallback text return');
+                
+                // Create a simplification map with original text IDs but with whatever text we received
+                const fallbackMap = {};
+                textItems.forEach((item, index) => {
+                    // For fallback, we'll just use the original HTML-sanitized text
+                    const sanitizedText = jsonString
+                        .replace(/<[^>]*>/g, '') // Remove HTML tags
+                        .replace(/\s+/g, ' ')    // Normalize whitespace
+                        .trim();
+                    
+                    fallbackMap[`text_${index}`] = sanitizedText || item.text;
+                });
+                
+                console.log('Created fallback simplification map with keys:', Object.keys(fallbackMap));
+                console.log('=== API CALL COMPLETED WITH FALLBACK TEXT ===');
+                return fallbackMap;
             }
         } else {
             console.error('No valid text content found in API response');
@@ -580,6 +741,270 @@ async function testAPI() {
     }
 }
 
+// Function to simplify the content of the page
+async function simplifyContent(cognitiveMode = 'textClarity', targetLanguage = 'en', simplificationLevel = 3, customPrompt = '') {
+    console.log(`Starting content simplification with mode: ${cognitiveMode}, language: ${targetLanguage}, level: ${simplificationLevel}`);
+    
+    // Generate the appropriate system prompt based on cognitive mode
+    let systemPrompt = '';
+    
+    // Define system prompts for different modes
+    const systemPrompts = {
+        'textClarity': "You are a helpful assistant that simplifies text while maintaining clarity. Make complex concepts easier to understand.",
+        'visualSymphony': "You are a helpful assistant that transforms text to be more visually descriptive and engaging. Paint a picture with words.",
+        'flowMaestro': "You are a helpful assistant that improves the flow and readability of text. Make the content more cohesive and easier to follow.",
+        'academicStyle': "You are a helpful assistant that adapts text to follow academic writing standards. Make the content more formal and scholarly.",
+        'technicalExplanation': "You are a helpful assistant that explains technical concepts clearly. Break down complex ideas into understandable components.",
+        'customPrompt': customPrompt || "You are a helpful assistant that transforms text according to custom instructions while maintaining the core meaning."
+    };
+    
+    // Set the system prompt based on the selected cognitive mode
+    systemPrompt = systemPrompts[cognitiveMode] || systemPrompts['textClarity'];
+    
+    // Adjust the prompt based on simplification level (1-5)
+    let levelAdjustment = '';
+    if (simplificationLevel <= 2) {
+        levelAdjustment = " Focus on maximum simplicity, using shorter sentences and basic vocabulary.";
+    } else if (simplificationLevel >= 4) {
+        levelAdjustment = " Maintain more nuance and sophistication in your simplification.";
+    }
+    
+    systemPrompt += levelAdjustment;
+    
+    console.log("Using system prompt:", systemPrompt);
+    
+    try {
+        // Find the main content element
+        const mainContentElement = findMainContentElement();
+        if (!mainContentElement) {
+            console.error('Main content element not found');
+            throw new Error('Could not identify the main content on this page');
+        }
+        
+        console.log(`Main content element found: ${mainContentElement.tagName}#${mainContentElement.id}.${mainContentElement.className}`);
+        
+        // Process each chunk
+        try {
+            // Find all text-containing elements
+            const textElements = [];
+            const findTextElements = (node) => {
+                // Skip non-element nodes
+                if (node.nodeType !== Node.ELEMENT_NODE) return;
+                
+                // Skip script, style, and other non-content elements
+                const tagName = node.tagName.toLowerCase();
+                if (['script', 'style', 'noscript', 'svg', 'img', 'video', 'audio', 'iframe', 'canvas', 'code', 'pre'].includes(tagName)) {
+                    return;
+                }
+                
+                // Check if this element has direct text content
+                let hasText = false;
+                let textContent = '';
+                
+                for (const child of node.childNodes) {
+                    if (child.nodeType === Node.TEXT_NODE) {
+                        const text = child.textContent.trim();
+                        if (text.length > 30) {  // Only consider substantial text
+                            hasText = true;
+                            textContent += text + ' ';
+                        }
+                    }
+                }
+                
+                // If this element has substantial text, add it to our list
+                if (hasText) {
+                    textElements.push({
+                        element: node,
+                        text: textContent.trim()
+                    });
+                }
+                
+                // Continue searching in child elements
+                for (const child of node.childNodes) {
+                    if (child.nodeType === Node.ELEMENT_NODE) {
+                        findTextElements(child);
+                    }
+                }
+            };
+            
+            // Start search from the main content container
+            findTextElements(mainContentElement);
+            
+            console.log(`Found ${textElements.length} text elements to process`);
+            
+            // Collect all text nodes that need simplification
+            const allTextNodes = [];
+            
+            // Process each text element to find text nodes
+            for (let i = 0; i < textElements.length; i++) {
+                const element = textElements[i].element;
+                
+                // We're removing this check to allow elements to be processed multiple times
+                // This enables the user to apply simplification repeatedly
+                
+                // Find all text nodes in this element
+                const walker = document.createTreeWalker(
+                    element,
+                    NodeFilter.SHOW_TEXT,
+                    { acceptNode: node => node.textContent.trim().length > 30 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT }
+                );
+                
+                let currentNode;
+                while (currentNode = walker.nextNode()) {
+                    allTextNodes.push({
+                        node: currentNode,
+                        element: element,
+                        text: currentNode.textContent,
+                        elementIndex: i
+                    });
+                }
+            }
+            
+            console.log(`Found ${allTextNodes.length} text nodes to simplify`);
+            
+            // Process text nodes in batches to reduce API calls
+            const BATCH_SIZE = 10; // Adjust based on your rate limits
+            for (let i = 0; i < allTextNodes.length; i += BATCH_SIZE) {
+                const batch = allTextNodes.slice(i, i + BATCH_SIZE);
+                console.log(`Processing batch ${Math.floor(i/BATCH_SIZE) + 1}, size: ${batch.length}`);
+                
+                try {
+                    // Get current language setting before making API call
+                    const currentLanguage = await new Promise((resolve) => {
+                        chrome.storage.sync.get(['selectedLanguage'], (result) => {
+                            resolve(result.selectedLanguage || targetLanguage || 'original');
+                        });
+                    });
+                    console.log(`Using language for batch ${Math.floor(i/BATCH_SIZE) + 1}: ${currentLanguage}`);
+                    
+                    // Simplify this batch of text nodes
+                    const simplifiedBatch = await simplifyTextWithTogetherAI(batch, systemPrompt, currentLanguage);
+                    
+                    console.log(`Received simplified batch with ${Object.keys(simplifiedBatch).length} items`);
+                    
+                    // Apply the simplified text to each node
+                    batch.forEach((nodeInfo, index) => {
+                        const nodeId = `text_${index}`;
+                        const simplifiedText = simplifiedBatch[nodeId];
+                        
+                        if (simplifiedText) {
+                            // Add additional logging to debug
+                            console.log(`Processing node ${nodeId}, simplified text:`, simplifiedText.substring(0, 100) + '...');
+                            
+                            // Save original for restoration
+                            if (!nodeInfo.node._originalText) {
+                                nodeInfo.node._originalText = nodeInfo.node.textContent;
+                            }
+                            
+                            // Check if this is a node with HTML content
+                            const hasHtmlElements = nodeInfo.element && (
+                                // Check for any HTML tags within the element
+                                (nodeInfo.element.innerHTML && nodeInfo.element.innerHTML.includes('<')) || 
+                                // Or check for specific common HTML elements
+                                nodeInfo.element.getElementsByTagName('a').length > 0 || 
+                                nodeInfo.element.getElementsByTagName('strong').length > 0 ||
+                                nodeInfo.element.getElementsByTagName('em').length > 0 ||
+                                nodeInfo.element.getElementsByTagName('b').length > 0 ||
+                                nodeInfo.element.getElementsByTagName('i').length > 0 ||
+                                nodeInfo.element.getElementsByTagName('span').length > 0 ||
+                                nodeInfo.element.getElementsByTagName('sup').length > 0 ||
+                                nodeInfo.element.getElementsByTagName('sub').length > 0 ||
+                                nodeInfo.element.getElementsByTagName('cite').length > 0 ||
+                                nodeInfo.element.getElementsByTagName('code').length > 0 ||
+                                nodeInfo.element.getElementsByTagName('mark').length > 0
+                            );
+                            
+                            // Check if the simplified text contains HTML tags
+                            const containsHtmlTags = simplifiedText.includes('<') && simplifiedText.includes('>');
+                            
+                            console.log(`Node ${nodeId} - hasHtmlElements: ${hasHtmlElements}, containsHtmlTags: ${containsHtmlTags}`);
+                            
+                            if (hasHtmlElements || containsHtmlTags) {
+                                // For HTML elements, replace the innerHTML instead of textContent
+                                if (!nodeInfo.element._originalHtml) {
+                                    nodeInfo.element._originalHtml = nodeInfo.element.innerHTML;
+                                }
+                                
+                                try {
+                                    // Replace element's innerHTML with simplified content
+                                    nodeInfo.element.innerHTML = simplifiedText;
+                                    console.log(`Updated innerHTML for ${nodeId}`);
+                                    
+                                    // Track the simplified element with HTML
+                                    simplifiedElements.push({
+                                        element: nodeInfo.element,
+                                        original: nodeInfo.element._originalHtml,
+                                        simplified: simplifiedText,
+                                        isHtml: true
+                                    });
+                                } catch (e) {
+                                    console.error(`Error updating innerHTML for ${nodeId}:`, e);
+                                    // Fallback to textContent if innerHTML fails
+                                    nodeInfo.node.textContent = simplifiedText.replace(/<[^>]*>/g, '');
+                                }
+                            } else {
+                                // For regular text nodes, replace the textContent
+                                nodeInfo.node.textContent = simplifiedText;
+                                console.log(`Updated textContent for ${nodeId}`);
+                                
+                                // Track the simplified node
+                                simplifiedElements.push({
+                                    node: nodeInfo.node,
+                                    element: nodeInfo.element,
+                                    original: nodeInfo.node._originalText,
+                                    simplified: simplifiedText,
+                                    isHtml: false
+                                });
+                            }
+                            
+                            // Mark element as processed
+                            nodeInfo.element.setAttribute('data-simplified', 'true');
+                            nodeInfo.element.setAttribute('data-original-text', nodeInfo.node._originalText);
+                        } else {
+                            console.warn(`No simplified text found for node ${nodeId}`);
+                        }
+                    });
+                } catch (error) {
+                    console.error(`Error processing batch:`, error);
+                }
+            }
+            
+            console.log(`Simplified ${simplifiedElements.length} text nodes in total`);
+            
+            // Show a notification
+            const notification = document.createElement('div');
+            notification.style.position = 'fixed';
+            notification.style.top = '20px';
+            notification.style.left = '50%';
+            notification.style.transform = 'translateX(-50%)';
+            notification.style.backgroundColor = '#4CAF50';
+            notification.style.color = 'white';
+            notification.style.padding = '10px 20px';
+            notification.style.borderRadius = '5px';
+            notification.style.zIndex = '9999';
+            notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+            notification.textContent = `Simplified ${simplifiedElements.length} text elements`;
+            
+            document.body.appendChild(notification);
+            
+            // Remove the notification after 3 seconds
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transition = 'opacity 0.5s';
+                setTimeout(() => notification.remove(), 500);
+            }, 3000);
+            
+            return simplifiedElements.length;
+        } catch (error) {
+            console.error('Error processing chunks:', error);
+            throw error;
+        }
+    } catch (error) {
+        console.error('Error simplifying content:', error);
+        throw error;
+    }
+}
+
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log('Message received in content script:', request);
@@ -655,293 +1080,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                             return;
                         }
 
-                        console.log('Finding main content element...');
-                        
-                        // Find the main content element
-                        const mainContent = document.body;
-                        
-                        // Helper function to check if element is a header
-                        const isHeader = (element) => {
-                            return element.tagName.match(/^H[1-6]$/i);
-                        };
-
-                        // Helper function to estimate token count (rough approximation)
-                        const estimateTokens = (text) => {
-                            return text.split(/\s+/).length * 1.3; // Multiply by 1.3 as a safety factor
-                        };
-                        
-                        // Helper function to get the path to an element
-                        const getElementPath = (element) => {
-                            const path = [];
-                            let currentElement = element;
-                            
-                            while (currentElement && currentElement !== document.body) {
-                                let selector = currentElement.tagName.toLowerCase();
-                                
-                                if (currentElement.id) {
-                                    selector += `#${currentElement.id}`;
-                                } else if (currentElement.className) {
-                                    selector += `.${Array.from(currentElement.classList).join('.')}`;
-                                }
-                                
-                                path.unshift(selector);
-                                currentElement = currentElement.parentElement;
-                            }
-                            
-                            return path.join(' > ');
-                        };
-
-                        // Find the main content container
-                        let mainContentContainer = null;
-                        
-                        // Try common content container selectors
-                        const contentContainerSelectors = [
-                            'article',
-                            'main',
-                            '.article',
-                            '.post',
-                            '.content',
-                            '.main-content',
-                            '.article-content',
-                            '.post-content',
-                            '#content',
-                            '#main-content'
-                        ];
-                        
-                        for (const selector of contentContainerSelectors) {
-                            const container = document.querySelector(selector);
-                            if (container && container.textContent.trim().length > 500) {
-                                mainContentContainer = container;
-                                console.log(`Found main content container using selector: ${selector}`);
-                                console.log(`Container path: ${getElementPath(container)}`);
-                                break;
-                            }
-                        }
-                        
-                        // If no container found, use the body as fallback
-                        if (!mainContentContainer) {
-                            console.log('No specific content container found, using document body');
-                            mainContentContainer = document.body;
-                        }
-                        
-                        // Clone the container to work with
-                        const containerClone = mainContentContainer.cloneNode(true);
-                        
-                        // Process each chunk
-                        try {
-                            // Find all text-containing elements
-                            const textElements = [];
-                            const findTextElements = (node) => {
-                                // Skip non-element nodes
-                                if (node.nodeType !== Node.ELEMENT_NODE) return;
-                                
-                                // Skip script, style, and other non-content elements
-                                const tagName = node.tagName.toLowerCase();
-                                if (['script', 'style', 'noscript', 'svg', 'img', 'video', 'audio', 'iframe', 'canvas', 'code', 'pre'].includes(tagName)) {
-                                    return;
-                                }
-                                
-                                // Check if this element has direct text content
-                                let hasText = false;
-                                let textContent = '';
-                                
-                                for (const child of node.childNodes) {
-                                    if (child.nodeType === Node.TEXT_NODE) {
-                                        const text = child.textContent.trim();
-                                        if (text.length > 30) {  // Only consider substantial text
-                                            hasText = true;
-                                            textContent += text + ' ';
-                                        }
-                                    }
-                                }
-                                
-                                // If this element has substantial text, add it to our list
-                                if (hasText) {
-                                    textElements.push({
-                                        element: node,
-                                        text: textContent.trim()
-                                    });
-                                }
-                                
-                                // Continue searching in child elements
-                                for (const child of node.childNodes) {
-                                    if (child.nodeType === Node.ELEMENT_NODE) {
-                                        findTextElements(child);
-                                    }
-                                }
-                            };
-                            
-                            // Start search from the main content container
-                            findTextElements(mainContentContainer);
-                            
-                            console.log(`Found ${textElements.length} text elements to process`);
-                            
-                            // Collect all text nodes that need simplification
-                            const allTextNodes = [];
-                            
-                            // Process each text element to find text nodes
-                            for (let i = 0; i < textElements.length; i++) {
-                                const element = textElements[i].element;
-                                
-                                // We're removing this check to allow elements to be processed multiple times
-                                // This enables the user to apply simplification repeatedly
-                                
-                                // Find all text nodes in this element
-                                const walker = document.createTreeWalker(
-                                    element,
-                                    NodeFilter.SHOW_TEXT,
-                                    { acceptNode: node => node.textContent.trim().length > 30 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT }
-                                );
-                                
-                                let currentNode;
-                                while (currentNode = walker.nextNode()) {
-                                    allTextNodes.push({
-                                        node: currentNode,
-                                        element: element,
-                                        text: currentNode.textContent,
-                                        elementIndex: i
-                                    });
-                                }
-                            }
-                            
-                            console.log(`Found ${allTextNodes.length} text nodes to simplify`);
-                            
-                            // Process text nodes in batches to reduce API calls
-                            const BATCH_SIZE = 10; // Adjust based on your rate limits
-                            for (let i = 0; i < allTextNodes.length; i += BATCH_SIZE) {
-                                const batch = allTextNodes.slice(i, i + BATCH_SIZE);
-                                console.log(`Processing batch ${Math.floor(i/BATCH_SIZE) + 1}, size: ${batch.length}`);
-                                
-                                try {
-                                    // Get current language setting before making API call
-                                    const currentLanguage = await new Promise((resolve) => {
-                                        chrome.storage.sync.get(['selectedLanguage'], (result) => {
-                                            resolve(result.selectedLanguage || 'original');
-                                        });
-                                    });
-                                    console.log(`Using language for batch ${Math.floor(i/BATCH_SIZE) + 1}: ${currentLanguage}`);
-                                    
-                                    // Simplify this batch of text nodes
-                                    const simplifiedBatch = await simplifyTextWithTogetherAI(batch, systemPrompt, currentLanguage);
-                                    
-                                    console.log(`Received simplified batch with ${Object.keys(simplifiedBatch).length} items`);
-                                    
-                                    // Apply the simplified text to each node
-                                    batch.forEach((nodeInfo, index) => {
-                                        const nodeId = `text_${index}`;
-                                        const simplifiedText = simplifiedBatch[nodeId];
-                                        
-                                        if (simplifiedText) {
-                                            // Add additional logging to debug
-                                            console.log(`Processing node ${nodeId}, simplified text:`, simplifiedText.substring(0, 100) + '...');
-                                            
-                                            // Save original for restoration
-                                            if (!nodeInfo.node._originalText) {
-                                                nodeInfo.node._originalText = nodeInfo.node.textContent;
-                                            }
-                                            
-                                            // Check if this is a node with HTML content
-                                            const hasHtmlElements = nodeInfo.element && (
-                                                // Check for any HTML tags within the element
-                                                (nodeInfo.element.innerHTML && nodeInfo.element.innerHTML.includes('<')) || 
-                                                // Or check for specific common HTML elements
-                                                nodeInfo.element.getElementsByTagName('a').length > 0 || 
-                                                nodeInfo.element.getElementsByTagName('strong').length > 0 ||
-                                                nodeInfo.element.getElementsByTagName('em').length > 0 ||
-                                                nodeInfo.element.getElementsByTagName('b').length > 0 ||
-                                                nodeInfo.element.getElementsByTagName('i').length > 0 ||
-                                                nodeInfo.element.getElementsByTagName('span').length > 0 ||
-                                                nodeInfo.element.getElementsByTagName('sup').length > 0 ||
-                                                nodeInfo.element.getElementsByTagName('sub').length > 0 ||
-                                                nodeInfo.element.getElementsByTagName('cite').length > 0 ||
-                                                nodeInfo.element.getElementsByTagName('code').length > 0 ||
-                                                nodeInfo.element.getElementsByTagName('mark').length > 0
-                                            );
-                                            
-                                            // Check if the simplified text contains HTML tags
-                                            const containsHtmlTags = simplifiedText.includes('<') && simplifiedText.includes('>');
-                                            
-                                            console.log(`Node ${nodeId} - hasHtmlElements: ${hasHtmlElements}, containsHtmlTags: ${containsHtmlTags}`);
-                                            
-                                            if (hasHtmlElements || containsHtmlTags) {
-                                                // For HTML elements, replace the innerHTML instead of textContent
-                                                if (!nodeInfo.element._originalHtml) {
-                                                    nodeInfo.element._originalHtml = nodeInfo.element.innerHTML;
-                                                }
-                                                
-                                                try {
-                                                    // Replace element's innerHTML with simplified content
-                                                    nodeInfo.element.innerHTML = simplifiedText;
-                                                    console.log(`Updated innerHTML for ${nodeId}`);
-                                                    
-                                                    // Track the simplified element with HTML
-                                                    simplifiedElements.push({
-                                                        element: nodeInfo.element,
-                                                        original: nodeInfo.element._originalHtml,
-                                                        simplified: simplifiedText,
-                                                        isHtml: true
-                                                    });
-                                                } catch (e) {
-                                                    console.error(`Error updating innerHTML for ${nodeId}:`, e);
-                                                    // Fallback to textContent if innerHTML fails
-                                                    nodeInfo.node.textContent = simplifiedText.replace(/<[^>]*>/g, '');
-                                                }
-                                            } else {
-                                                // For regular text nodes, replace the textContent
-                                                nodeInfo.node.textContent = simplifiedText;
-                                                console.log(`Updated textContent for ${nodeId}`);
-                                                
-                                                // Track the simplified node
-                                                simplifiedElements.push({
-                                                    node: nodeInfo.node,
-                                                    element: nodeInfo.element,
-                                                    original: nodeInfo.node._originalText,
-                                                    simplified: simplifiedText,
-                                                    isHtml: false
-                                                });
-                                            }
-                                            
-                                            // Mark element as processed
-                                            nodeInfo.element.setAttribute('data-simplified', 'true');
-                                        } else {
-                                            console.warn(`No simplified text found for node ${nodeId}`);
-                                        }
-                                    });
-                                } catch (error) {
-                                    console.error(`Error processing batch:`, error);
-                                }
-                            }
-                            
-                            console.log(`Simplified ${simplifiedElements.length} text nodes in total`);
-                            
-                            // Show a notification
-                            const notification = document.createElement('div');
-                            notification.style.position = 'fixed';
-                            notification.style.top = '20px';
-                            notification.style.left = '50%';
-                            notification.style.transform = 'translateX(-50%)';
-                            notification.style.backgroundColor = '#4CAF50';
-                            notification.style.color = 'white';
-                            notification.style.padding = '10px 20px';
-                            notification.style.borderRadius = '5px';
-                            notification.style.zIndex = '9999';
-                            notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
-                            notification.textContent = `Simplified ${simplifiedElements.length} text elements`;
-                            
-                            document.body.appendChild(notification);
-                            
-                            // Remove the notification after 3 seconds
-                            setTimeout(() => {
-                                notification.style.opacity = '0';
-                                notification.style.transition = 'opacity 0.5s';
-                                setTimeout(() => notification.remove(), 500);
-                            }, 3000);
-                            
-                            sendResponse({success: true});
-                        } catch (error) {
-                            console.error('Error processing chunks:', error);
-                            sendResponse({success: false, error: error.message});
-                        }
+                        // Use the new simplifyContent function
+                        const simplifiedCount = await simplifyContent();
+                        sendResponse({success: true, count: simplifiedCount});
                     } catch (error) {
                         console.error('Error simplifying content:', error);
                         sendResponse({success: false, error: error.message});
@@ -1024,6 +1165,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     console.log("Restoring original content...");
                     const restored = restoreOriginalContent();
                     sendResponse({success: restored});
+                    break;
+                
+                case "toggle-slider":
+                    console.log("Toggle slider request received");
+                    await injectSlider();
+                    // The slider.js will handle the toggle logic itself
+                    sendResponse({success: true});
                     break;
                 
                 default:
@@ -1324,6 +1472,693 @@ function restoreOriginalContent() {
     return true;
 }
 
+// Function to inject the slider resources and script
+async function injectSlider() {
+    console.log("Injecting slider...");
+    
+    if (!sliderInjected) {
+        try {
+            // Inject slider CSS
+            const sliderCssLink = document.createElement('link');
+            sliderCssLink.rel = 'stylesheet';
+            sliderCssLink.href = chrome.runtime.getURL('slider.css');
+            document.head.appendChild(sliderCssLink);
+            console.log("Slider CSS injected");
+            
+            // Create the slider DOM structure directly instead of using a separate script
+            const slider = document.createElement('div');
+            slider.className = 'cogni-llama-slider';
+            
+            // Create slider HTML content (copy from slider.js createSliderHTML function)
+            slider.innerHTML = `
+                <div class="cogni-llama-slider-header">
+                    <h2>
+                        <img src="${chrome.runtime.getURL('images/icon48.png')}" alt="Cogni Icon">
+                        Cogni-llama
+                    </h2>
+                    <button id="cogni-llama-close-slider" aria-label="Close">×</button>
+                </div>
+                
+                <div class="cogni-llama-tabs">
+                    <div class="cogni-llama-tab active" data-tab="ai">AI Configuration</div>
+                    <div class="cogni-llama-tab" data-tab="ui">UI Settings</div>
+                </div>
+                
+                <div class="cogni-llama-slider-content">
+                    <!-- AI Configuration Tab Content -->
+                    <div class="cogni-llama-tab-content active" id="ai-tab">
+                        <div class="cogni-llama-section">
+                            <h3><i class="fa-solid fa-brain"></i> Cognitive Mode</h3>
+                            <div class="cogni-llama-option-cards">
+                                <div class="cogni-llama-option-card" data-value="textClarity">
+                                    <i class="fa-solid fa-lightbulb"></i>
+                                    <span>Mind Illuminator</span>
+                                </div>
+                                <div class="cogni-llama-option-card" data-value="visualSymphony">
+                                    <i class="fa-solid fa-eye"></i>
+                                    <span>Visual Symphony</span>
+                                </div>
+                                <div class="cogni-llama-option-card" data-value="flowMaestro">
+                                    <i class="fa-solid fa-book-open"></i>
+                                    <span>Flow Maestro</span>
+                                </div>
+                                <div class="cogni-llama-option-card" data-value="academicStyle">
+                                    <i class="fa-solid fa-graduation-cap"></i>
+                                    <span>Academic Scholar</span>
+                                </div>
+                                <div class="cogni-llama-option-card" data-value="technicalExplanation">
+                                    <i class="fa-solid fa-code"></i>
+                                    <span>Tech Explainer</span>
+                                </div>
+                                <div class="cogni-llama-option-card" data-value="customPrompt">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                    <span>Custom Mode</span>
+                                    <i class="fa-solid fa-pen-to-square cogni-llama-edit-icon" id="cogni-llama-edit-custom"></i>
+                                </div>
+                            </div>
+                            
+                            <div id="cogni-llama-custom-prompt-area" class="cogni-llama-custom-prompt-area hidden">
+                                <textarea id="cogni-llama-custom-prompt-input" placeholder="Enter your custom instructions here. For example: 'Rewrite this text in the style of Shakespeare' or 'Explain this as if teaching to a high school student'"></textarea>
+                                <button id="cogni-llama-save-custom-prompt" class="cogni-llama-button cogni-llama-primary-button">
+                                    <i class="fa-solid fa-save"></i> Save Custom Prompt
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="cogni-llama-section">
+                            <h3><i class="fa-solid fa-globe"></i> Target Language</h3>
+                            <div class="cogni-llama-control">
+                                <select id="cogni-llama-language-selector">
+                                    <option value="original">Original</option>
+                                    <option value="en">English</option>
+                                    <option value="es">Spanish</option>
+                                    <option value="fr">French</option>
+                                    <option value="de">German</option>
+                                    <option value="it">Italian</option>
+                                    <option value="pt">Portuguese</option>
+                                    <option value="ar">Arabic</option>
+                                    <option value="hi">Hindi</option>
+                                    <option value="id">Indonesian</option>
+                                    <option value="tl">Tagalog</option>
+                                    <option value="th">Thai</option>
+                                    <option value="vi">Vietnamese</option>
+                                    <option value="zh">Chinese (Simplified)</option>
+                                    <option value="ja">Japanese</option>
+                                    <option value="ko">Korean</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="cogni-llama-section">
+                            <h3><i class="fa-solid fa-sliders"></i> Simplification Level</h3>
+                            <div class="cogni-llama-slider-container">
+                                <div class="cogni-llama-slider-labels">
+                                    <span>Simple</span>
+                                    <span>Balanced</span>
+                                    <span>Detailed</span>
+                                </div>
+                                <input type="range" id="cogni-llama-simplification-slider" class="cogni-llama-range-slider" min="1" max="5" step="1" value="3">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- UI Settings Tab Content -->
+                    <div class="cogni-llama-tab-content" id="ui-tab">
+                        <div class="cogni-llama-section">
+                            <h3><i class="fa-solid fa-palette"></i> Appearance</h3>
+                            <div class="cogni-llama-control">
+                                <label for="cogni-llama-font-selector">Font Style</label>
+                                <select id="cogni-llama-font-selector">
+                                    <option value="default">Default</option>
+                                    <option value="verdana">Verdana</option>
+                                    <option value="opensans">Open Sans</option>
+                                    <option value="comicsans">Comic Sans</option>
+                                    <option value="bbc">BBC Reith</option>
+                                    <option value="carnaby">Carnaby Street</option>
+                                    <option value="opendyslexic">OpenDyslexic</option>
+                                </select>
+                            </div>
+                            
+                            <div class="cogni-llama-control">
+                                <label for="cogni-llama-theme-selector">Theme</label>
+                                <select id="cogni-llama-theme-selector">
+                                    <option value="default">Default</option>
+                                    <option value="darkMode">Dark Mode</option>
+                                    <option value="sepia">Sepia</option>
+                                    <option value="creamPaper">Cream Paper</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="cogni-llama-section">
+                            <h3><i class="fa-solid fa-text-width"></i> Spacing</h3>
+                            
+                            <div class="cogni-llama-control">
+                                <label for="cogni-llama-line-spacing">Line Spacing <span id="cogni-llama-line-spacing-value">1.5x</span></label>
+                                <input type="range" id="cogni-llama-line-spacing" class="cogni-llama-range-slider" min="1" max="3" step="0.1" value="1.5">
+                            </div>
+                            
+                            <div class="cogni-llama-control">
+                                <label for="cogni-llama-letter-spacing">Letter Spacing <span id="cogni-llama-letter-spacing-value">1x</span></label>
+                                <input type="range" id="cogni-llama-letter-spacing" class="cogni-llama-range-slider" min="0" max="5" step="0.1" value="1">
+                            </div>
+                            
+                            <div class="cogni-llama-control">
+                                <label for="cogni-llama-word-spacing">Word Spacing <span id="cogni-llama-word-spacing-value">4x</span></label>
+                                <input type="range" id="cogni-llama-word-spacing" class="cogni-llama-range-slider" min="0" max="10" step="0.5" value="4">
+                            </div>
+                        </div>
+                        
+                        <div class="cogni-llama-section">
+                            <h3><i class="fa-solid fa-keyboard"></i> Keyboard Shortcuts</h3>
+                            <div class="cogni-llama-control">
+                                <label>Toggle Slider</label>
+                                <div class="cogni-llama-shortcut-keys">Ctrl/Cmd + Shift + L</div>
+                            </div>
+                            <div class="cogni-llama-control">
+                                <label>Simplify Page</label>
+                                <div class="cogni-llama-shortcut-keys">Ctrl/Cmd + Shift + S</div>
+                            </div>
+                        </div>
+                        
+                        <div class="cogni-llama-section">
+                            <button id="cogni-llama-reset-defaults" class="cogni-llama-button">
+                                <i class="fa-solid fa-rotate-left"></i> Reset to Defaults
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Llama Magic Button - Always visible at bottom -->
+                <div class="cogni-llama-buttons">
+                    <button id="cogni-llama-simplify" class="cogni-llama-button cogni-llama-primary-button cogni-llama-simplify-text">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Llama Magic
+                    </button>
+                </div>
+            `;
+            
+            // Add fontawesome link
+            const fontAwesomeLink = document.createElement('link');
+            fontAwesomeLink.rel = 'stylesheet';
+            fontAwesomeLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css';
+            document.head.appendChild(fontAwesomeLink);
+            
+            // Add Inter font link
+            const interFontLink = document.createElement('link');
+            interFontLink.rel = 'stylesheet';
+            interFontLink.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
+            document.head.appendChild(interFontLink);
+            
+            // Append the slider to the DOM
+            document.body.appendChild(slider);
+            console.log("Slider DOM created and injected");
+            
+            // Initialize slider functionality
+            initializeSliderFunctionality();
+            
+            sliderInjected = true;
+        } catch (error) {
+            console.error("Error injecting slider:", error);
+            throw error;
+        }
+    }
+    
+    // Toggle slider visibility
+    toggleSlider();
+}
+
+// Function to toggle slider visibility
+function toggleSlider() {
+    console.log("Toggling slider visibility...");
+    const slider = document.querySelector('.cogni-llama-slider');
+    if (slider) {
+        slider.classList.toggle('visible');
+        console.log("Slider visibility toggled:", slider.classList.contains('visible'));
+    } else {
+        console.error("Slider element not found!");
+    }
+}
+
+// Function to initialize slider functionality
+function initializeSliderFunctionality() {
+    // Get slider elements
+    const closeButton = document.getElementById('cogni-llama-close-slider');
+    const tabs = document.querySelectorAll('.cogni-llama-tab');
+    const optionCards = document.querySelectorAll('.cogni-llama-option-card');
+    const editCustomButton = document.getElementById('cogni-llama-edit-custom');
+    const customPromptArea = document.getElementById('cogni-llama-custom-prompt-area');
+    const simplifyButton = document.getElementById('cogni-llama-simplify');
+    const themeSelector = document.getElementById('cogni-llama-theme-selector');
+    const fontSizeSelector = document.getElementById('cogni-llama-font-selector');
+    const saveCustomPromptButton = document.getElementById('cogni-llama-save-custom-prompt');
+    const resetDefaultsButton = document.getElementById('cogni-llama-reset-defaults');
+    
+    console.log("Initializing slider functionality with elements:", {
+        closeButton: !!closeButton,
+        tabs: tabs.length,
+        optionCards: optionCards.length,
+        editCustomButton: !!editCustomButton,
+        customPromptArea: !!customPromptArea,
+        simplifyButton: !!simplifyButton,
+        themeSelector: !!themeSelector,
+        fontSizeSelector: !!fontSizeSelector,
+        saveCustomPromptButton: !!saveCustomPromptButton,
+        resetDefaultsButton: !!resetDefaultsButton
+    });
+    
+    // Close button functionality
+    if (closeButton) {
+        closeButton.addEventListener('click', () => {
+            toggleSlider();
+        });
+    }
+    
+    // Tab switching functionality
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Remove active class from all tabs and tab contents
+            tabs.forEach(t => {
+                t.classList.remove('active');
+                t.style.borderBottom = 'none'; // Reset border for all tabs
+            });
+            document.querySelectorAll('.cogni-llama-tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Add active class to clicked tab and corresponding content
+            tab.classList.add('active');
+            const tabName = tab.getAttribute('data-tab');
+            const tabContent = document.getElementById(`${tabName}-tab`);
+            if (tabContent) {
+                tabContent.classList.add('active');
+            }
+            
+            // Add coral underline to active tab - using our new coral color
+            tab.style.borderBottom = '3px solid var(--primary-coral)';
+        });
+    });
+    
+    // Option cards functionality
+    if (optionCards && optionCards.length > 0) {
+        console.log(`Found ${optionCards.length} option cards to initialize`);
+        
+        // Create a new array to store references to the cloned cards
+        const clonedCards = [];
+        
+        optionCards.forEach((card, index) => {
+            // Log what we're attaching events to
+            console.log(`Setting up card ${index}: value=${card.getAttribute('data-value')}, classes=${card.className}`);
+            
+            // Remove any existing click handlers by creating a clone
+            const cardClone = card.cloneNode(true);
+            card.parentNode.replaceChild(cardClone, card);
+            
+            // Store reference to the cloned card
+            clonedCards.push(cardClone);
+            
+            // Add new click handler to the clone
+            cardClone.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation(); // Stop event bubbling
+                
+                // Skip if the click was directly on the edit icon
+                if (e.target.classList.contains('cogni-llama-edit-icon')) {
+                    console.log(`Click was on edit icon, ignoring card selection`);
+                    return;
+                }
+                
+                const value = this.getAttribute('data-value');
+                console.log(`Option card clicked: ${value}`);
+                
+                // Clear selection from all cards with direct DOM manipulation
+                document.querySelectorAll('.cogni-llama-option-card').forEach(c => {
+                    c.classList.remove('selected');
+                    console.log(`Removed 'selected' from card`);
+                });
+                
+                // Add selected class to clicked card with direct DOM manipulation
+                this.classList.add('selected');
+                console.log(`Added 'selected' to ${value}`);
+                
+                // Apply inline styles for immediate visual feedback
+                this.style.background = 'linear-gradient(135deg, rgba(24, 119, 242, 0.2) 0%, rgba(24, 119, 242, 0.3) 100%)';
+                this.style.color = '#0a58ca';
+                this.style.borderColor = '#0a58ca';
+                this.style.boxShadow = '0 0 8px rgba(24, 119, 242, 0.5)';
+                this.style.transform = 'translateY(-2px)';
+                this.style.fontWeight = 'bold';
+                
+                // Reset styles on other cards
+                clonedCards.forEach(otherCard => {
+                    if (otherCard !== this) {
+                        otherCard.style.background = '';
+                        otherCard.style.color = '';
+                        otherCard.style.borderColor = '';
+                        otherCard.style.boxShadow = '';
+                        otherCard.style.transform = '';
+                        otherCard.style.fontWeight = '';
+                    }
+                });
+                
+                // Handle custom prompt area visibility
+                if (value === 'customPrompt' && customPromptArea) {
+                    customPromptArea.classList.remove('hidden');
+                    console.log(`Made custom prompt area visible`);
+                } else if (customPromptArea) {
+                    customPromptArea.classList.add('hidden');
+                    console.log(`Hid custom prompt area`);
+                }
+                
+                // Save the selected option to storage with clear logging
+                console.log(`Saving cognitive mode selection: ${value}`);
+                chrome.storage.sync.set({ 'cognitiveMode': value }, function() {
+                    console.log(`Successfully saved cognitive mode: ${value}`);
+                });
+            });
+            
+            // Add explicit pointer cursor to emphasize clickability
+            cardClone.style.cursor = 'pointer';
+        });
+        
+        // Add event delegation on the parent container as a backup
+        const optionCardsContainer = document.querySelector('.cogni-llama-option-cards');
+        if (optionCardsContainer) {
+            optionCardsContainer.addEventListener('click', function(e) {
+                const cardElement = e.target.closest('.cogni-llama-option-card');
+                if (cardElement && !e.target.classList.contains('cogni-llama-edit-icon')) {
+                    // Trigger click on the card if it wasn't directly clicked
+                    if (e.target !== cardElement) {
+                        console.log('Triggering click through delegation');
+                        cardElement.click();
+                    }
+                }
+            });
+        }
+    } else {
+        console.error("No option cards found in the slider!");
+    }
+    
+    // Edit custom prompt button
+    if (editCustomButton) {
+        editCustomButton.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering the card's click event
+            console.log("Edit custom prompt button clicked");
+            customPromptArea.classList.toggle('hidden');
+            
+            // Select the Custom Mode card
+            optionCards.forEach(card => {
+                if (card.getAttribute('data-value') === 'customPrompt') {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            });
+        });
+    }
+    
+    // Save custom prompt button
+    if (saveCustomPromptButton) {
+        saveCustomPromptButton.addEventListener('click', () => {
+            console.log("Save custom prompt button clicked");
+            const customPromptInput = document.getElementById('cogni-llama-custom-prompt-input');
+            if (customPromptInput) {
+                const customPromptText = customPromptInput.value;
+                chrome.storage.sync.set({ customPromptText: customPromptText });
+                
+                // Show feedback to the user
+                saveCustomPromptButton.textContent = 'Saved!';
+                setTimeout(() => {
+                    saveCustomPromptButton.innerHTML = '<i class="fa-solid fa-save"></i> Save Custom Prompt';
+                }, 2000);
+            }
+        });
+    }
+    
+    // Font selector functionality
+    if (fontSizeSelector) {
+        fontSizeSelector.addEventListener('change', () => {
+            const selectedFont = fontSizeSelector.value;
+            console.log(`Font changed to: ${selectedFont}`);
+            
+            // Save to storage
+            chrome.storage.sync.set({ selectedFont: selectedFont });
+            
+            // Apply font change
+            applyFont(selectedFont);
+        });
+    }
+    
+    // Theme selector functionality
+    if (themeSelector) {
+        themeSelector.addEventListener('change', () => {
+            const selectedTheme = themeSelector.value;
+            console.log(`Theme changed to: ${selectedTheme}`);
+            
+            // Save to storage
+            chrome.storage.sync.set({ selectedTheme: selectedTheme });
+            
+            // Apply theme change
+            applyTheme(selectedTheme);
+        });
+    }
+    
+    // Spacing sliders functionality
+    const lineSpacingSlider = document.getElementById('cogni-llama-line-spacing');
+    const lineSpacingValue = document.getElementById('cogni-llama-line-spacing-value');
+    const letterSpacingSlider = document.getElementById('cogni-llama-letter-spacing');
+    const letterSpacingValue = document.getElementById('cogni-llama-letter-spacing-value');
+    const wordSpacingSlider = document.getElementById('cogni-llama-word-spacing');
+    const wordSpacingValue = document.getElementById('cogni-llama-word-spacing-value');
+    
+    if (lineSpacingSlider && lineSpacingValue) {
+        lineSpacingSlider.addEventListener('input', () => {
+            const value = lineSpacingSlider.value;
+            lineSpacingValue.textContent = `${value}x`;
+            
+            // Save and apply
+            chrome.storage.sync.set({ lineSpacing: value });
+            applySpacingAdjustments(value, letterSpacingSlider?.value || 0, wordSpacingSlider?.value || 0);
+        });
+    }
+    
+    if (letterSpacingSlider && letterSpacingValue) {
+        letterSpacingSlider.addEventListener('input', () => {
+            const value = letterSpacingSlider.value;
+            letterSpacingValue.textContent = `${value}px`;
+            
+            // Save and apply
+            chrome.storage.sync.set({ letterSpacing: value });
+            applySpacingAdjustments(lineSpacingSlider?.value || 1.5, value, wordSpacingSlider?.value || 0);
+        });
+    }
+    
+    if (wordSpacingSlider && wordSpacingValue) {
+        wordSpacingSlider.addEventListener('input', () => {
+            const value = wordSpacingSlider.value;
+            wordSpacingValue.textContent = `${value}px`;
+            
+            // Save and apply
+            chrome.storage.sync.set({ wordSpacing: value });
+            applySpacingAdjustments(lineSpacingSlider?.value || 1.5, letterSpacingSlider?.value || 0, value);
+        });
+    }
+    
+    // Simplify button (Llama Magic) functionality
+    if (simplifyButton) {
+        simplifyButton.addEventListener('click', () => {
+            console.log("Llama Magic button clicked");
+            
+            // Show loading state
+            const originalButtonText = simplifyButton.innerHTML;
+            simplifyButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+            simplifyButton.disabled = true;
+            
+            // Get the selected cognitive mode
+            let cognitiveMode = '';
+            optionCards.forEach(card => {
+                if (card.classList.contains('selected')) {
+                    cognitiveMode = card.getAttribute('data-value');
+                }
+            });
+            
+            // Get custom prompt if in custom mode
+            let customPrompt = '';
+            if (cognitiveMode === 'customPrompt') {
+                customPrompt = document.getElementById('cogni-llama-custom-prompt-input').value;
+                console.log(`Custom prompt: ${customPrompt}`);
+            }
+            
+            // Get selected language
+            const languageSelector = document.getElementById('cogni-llama-language-selector');
+            let targetLanguage = 'en'; // Default to English
+            
+            if (languageSelector) {
+                targetLanguage = languageSelector.value;
+                console.log(`Target language: ${targetLanguage}`);
+            }
+            
+            // Get simplification level
+            const simplificationSlider = document.getElementById('cogni-llama-simplification-slider');
+            let simplificationLevel = 3; // Default to medium
+            
+            if (simplificationSlider) {
+                simplificationLevel = parseInt(simplificationSlider.value);
+                console.log(`Simplification level: ${simplificationLevel}`);
+            }
+            
+            // Call the simplifyContent function
+            simplifyContent(cognitiveMode, targetLanguage, simplificationLevel, customPrompt)
+                .then(() => {
+                    // Restore button state
+                    simplifyButton.innerHTML = originalButtonText;
+                    simplifyButton.disabled = false;
+                    console.log('Content simplification completed');
+                })
+                .catch(error => {
+                    console.error('Error simplifying content:', error);
+                    // Restore button state and show error
+                    simplifyButton.innerHTML = originalButtonText;
+                    simplifyButton.disabled = false;
+                    alert(`Error: ${error.message}`);
+                });
+        });
+    }
+    
+    // Reset defaults button
+    if (resetDefaultsButton) {
+        resetDefaultsButton.addEventListener('click', () => {
+            console.log("Reset defaults button clicked");
+            
+            // Reset settings in storage
+            chrome.storage.sync.set({
+                cognitiveMode: 'textClarity',
+                targetLanguage: 'en',
+                simplificationLevel: 3,
+                selectedTheme: 'default',
+                selectedFont: 'default',
+                lineSpacing: 1.5,
+                letterSpacing: 0,
+                wordSpacing: 0
+            });
+            
+            // Update UI to reflect defaults
+            if (themeSelector) themeSelector.value = 'default';
+            if (fontSizeSelector) fontSizeSelector.value = 'default';
+            
+            // Reset cognitive mode selection
+            if (optionCards && optionCards.length > 0) {
+                optionCards.forEach(card => {
+                    card.classList.remove('selected');
+                    if (card.getAttribute('data-value') === 'textClarity') {
+                        card.classList.add('selected');
+                    }
+                });
+            }
+            
+            // Reset language selector
+            const languageSelector = document.getElementById('cogni-llama-language-selector');
+            if (languageSelector) languageSelector.value = 'en';
+            
+            // Reset simplification slider
+            const simplificationSlider = document.getElementById('cogni-llama-simplification-slider');
+            if (simplificationSlider) simplificationSlider.value = 3;
+            
+            // Reset spacing sliders
+            if (lineSpacingSlider) lineSpacingSlider.value = 1.5;
+            if (lineSpacingValue) lineSpacingValue.textContent = '1.5x';
+            
+            if (letterSpacingSlider) letterSpacingSlider.value = 0;
+            if (letterSpacingValue) letterSpacingValue.textContent = '0px';
+            
+            if (wordSpacingSlider) wordSpacingSlider.value = 0;
+            if (wordSpacingValue) wordSpacingValue.textContent = '0px';
+            
+            // Apply changes
+            applyFont('default');
+            applyTheme('default');
+            applySpacingAdjustments(1.5, 0, 0);
+            
+            // Show feedback
+            resetDefaultsButton.innerHTML = '<i class="fa-solid fa-check"></i> Settings Reset!';
+            setTimeout(() => {
+                resetDefaultsButton.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Reset to Defaults';
+            }, 2000);
+        });
+    }
+    
+    // Load settings from storage
+    chrome.storage.sync.get([
+        'optimizeFor',
+        'customPromptText',
+        'selectedFont',
+        'selectedTheme',
+        'lineSpacing',
+        'letterSpacing',
+        'wordSpacing',
+        'selectedLanguage',
+        'simplificationLevel'
+    ], result => {
+        console.log("Loading saved settings:", result);
+        
+        // Initialize optimization mode
+        const optimizeFor = result.optimizeFor || 'focusStructure';
+        optionCards.forEach(card => {
+            if (card.getAttribute('data-value') === optimizeFor) {
+                card.classList.add('selected');
+                if (optimizeFor === 'customPrompt') {
+                    customPromptArea.classList.remove('hidden');
+                }
+            } else {
+                card.classList.remove('selected');
+            }
+        });
+        
+        // Set custom prompt
+        if (result.customPromptText) {
+            const customPromptInput = document.getElementById('cogni-llama-custom-prompt-input');
+            if (customPromptInput) {
+                customPromptInput.value = result.customPromptText;
+            }
+        }
+        
+        // Set language
+        const languageSelector = document.getElementById('cogni-llama-language-selector');
+        if (languageSelector && result.selectedLanguage) {
+            languageSelector.value = result.selectedLanguage;
+        }
+        
+        // Set simplification level
+        const simplificationSlider = document.getElementById('cogni-llama-simplification-slider');
+        if (simplificationSlider && result.simplificationLevel) {
+            simplificationSlider.value = result.simplificationLevel;
+        }
+        
+        // Set font
+        if (fontSizeSelector && result.selectedFont) {
+            fontSizeSelector.value = result.selectedFont;
+        }
+        
+        // Set theme
+        if (themeSelector && result.selectedTheme) {
+            themeSelector.value = result.selectedTheme;
+        }
+    });
+}
+
+// Add a direct keyboard event listener to the document
+document.addEventListener('keydown', function(e) {
+    // Check for Cmd+Shift+L (Mac) or Ctrl+Shift+L (Windows/Linux)
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'l') {
+        console.log('Direct keyboard shortcut detected: Command/Ctrl+Shift+L');
+        if (!sliderInjected) {
+            injectSlider();
+        } else {
+            toggleSlider();
+        }
+        e.preventDefault(); // Prevent default browser behavior
+    }
+});
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     ensureInitialized();
@@ -1349,4 +2184,94 @@ document.addEventListener('DOMContentLoaded', () => {
         0,    // Default letter spacing
         0     // Default word spacing
     );
+});
+
+// Cognitive mode selection
+const cognitiveCards = document.querySelectorAll('.cogni-llama-option-card');
+    
+cognitiveCards.forEach(card => {
+    card.addEventListener('click', () => {
+        // Remove selected class from all cards
+        cognitiveCards.forEach(c => c.classList.remove('selected'));
+        
+        // Add selected class to clicked card
+        card.classList.add('selected');
+        
+        const cognitiveMode = card.getAttribute('data-value');
+        console.log(`Cognitive mode selected: ${cognitiveMode}`);
+        
+        // Show custom prompt input if the custom mode is selected
+        if (cognitiveMode === 'customPrompt') {
+            document.getElementById('cogni-llama-custom-prompt-area').classList.remove('hidden');
+        } else {
+            document.getElementById('cogni-llama-custom-prompt-area').classList.add('hidden');
+        }
+        
+        // Save the selected cognitive mode
+        chrome.storage.sync.set({ 'cognitiveMode': cognitiveMode }, function() {
+            console.log(`Cognitive mode saved: ${cognitiveMode}`);
+        });
+    });
+});
+
+// Initialize the Llama Magic button with modern style
+const simplifyButton = document.querySelector('#cogni-llama-simplify');
+    
+simplifyButton.addEventListener('click', function() {
+    console.log('Llama Magic button clicked');
+    
+    // Add loading state
+    const originalText = simplifyButton.innerHTML;
+    simplifyButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+    simplifyButton.disabled = true;
+    
+    // Get the selected cognitive mode
+    let cognitiveMode = 'textClarity'; // Default value
+    
+    const selectedCard = document.querySelector('.cogni-llama-option-card.selected');
+    if (selectedCard) {
+        cognitiveMode = selectedCard.getAttribute('data-value');
+    } else {
+        // If no card is selected, select the first one by default
+        const firstCard = document.querySelector('.cogni-llama-option-card');
+        if (firstCard) {
+            firstCard.classList.add('selected');
+            cognitiveMode = firstCard.getAttribute('data-value');
+        }
+    }
+    
+    console.log(`Using cognitive mode: ${cognitiveMode}`);
+    
+    // Get custom prompt if in custom mode
+    let customPrompt = '';
+    if (cognitiveMode === 'customPrompt') {
+        customPrompt = document.getElementById('cogni-llama-custom-prompt-input').value;
+        console.log(`Custom prompt: ${customPrompt}`);
+    }
+    
+    // Get selected language
+    const languageSelector = document.getElementById('cogni-llama-language-selector');
+    const targetLanguage = languageSelector ? languageSelector.value : 'original';
+    console.log(`Target language: ${targetLanguage}`);
+    
+    // Get simplification level
+    const simplificationSlider = document.getElementById('cogni-llama-simplification-slider');
+    const simplificationLevel = simplificationSlider ? simplificationSlider.value : 3;
+    console.log(`Simplification level: ${simplificationLevel}`);
+    
+    // Call the simplifyContent function
+    simplifyContent(cognitiveMode, targetLanguage, simplificationLevel, customPrompt)
+        .then(() => {
+            // Restore button state
+            simplifyButton.innerHTML = originalText;
+            simplifyButton.disabled = false;
+            console.log('Content simplification completed');
+        })
+        .catch(error => {
+            console.error('Error simplifying content:', error);
+            // Restore button state and show error
+            simplifyButton.innerHTML = originalText;
+            simplifyButton.disabled = false;
+            alert(`Error: ${error.message}`);
+        });
 });

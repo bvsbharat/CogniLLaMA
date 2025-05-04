@@ -2,156 +2,494 @@
  * Slider.css - Styles for the CogniLLaMA configuration slider
  */
 
+:root {
+    /* Primary colors - updated to match Image 2 */
+    --primary-coral: #f47c5d;
+    --primary-yellow: #ffd24c;
+    --primary-teal: #a8e6cf;
+    --primary-mint: #ddf5e3;
+    
+    /* Neutral colors - light theme */
+    --neutral-black: #222222;
+    --neutral-gray-800: #3d4148;
+    --neutral-gray-600: #6c757d;
+    --neutral-gray-300: #dee2e6;
+    --neutral-gray-200: #e9ecef;
+    --neutral-gray-100: #f8f9fa;
+    --neutral-white: #ffffff;
+    
+    /* Accent colors */
+    --accent-green: #59c692;
+    --accent-blue: #75c7fc;
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.08);
+    
+    /* Border radius */
+    --radius-sm: 4px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+    --radius-pill: 50px;
+    
+    /* Typography */
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    
+    /* Spacing */
+    --spacing-1: 0.25rem;
+    --spacing-2: 0.5rem;
+    --spacing-3: 1rem;
+    --spacing-4: 1.5rem;
+}
+
 .cogni-llama-slider {
     position: fixed;
     top: 0;
-    right: -350px;
+    left: -350px; /* Starting position off-screen */
     width: 350px;
     height: 100vh;
-    background-color: #ffffff;
-    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.2);
+    background-color: var(--neutral-white);
+    box-shadow: var(--shadow-lg);
     z-index: 2147483647; /* Maximum z-index value */
-    transition: right 0.3s ease;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    transition: left 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    font-family: var(--font-sans);
     overflow-y: auto;
     box-sizing: border-box;
+    transform: translateZ(0); /* Hardware acceleration */
+    color: var(--neutral-black);
 }
 
 .cogni-llama-slider.visible {
-    right: 0;
+    left: 0;
+    animation: slideInFromLeft 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes slideInFromLeft {
+    0% {
+        left: -350px;
+        opacity: 0.7;
+    }
+    100% {
+        left: 0;
+        opacity: 1;
+    }
+}
+
+/* Animation for sliding out */
+.cogni-llama-slider:not(.visible) {
+    animation: slideOutToLeft 0.3s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+}
+
+@keyframes slideOutToLeft {
+    0% {
+        left: 0;
+        opacity: 1;
+    }
+    100% {
+        left: -350px;
+        opacity: 0.7;
+    }
 }
 
 .cogni-llama-slider-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 15px;
-    background-color: #4a86e8;
-    color: white;
-    border-bottom: 1px solid #e0e0e0;
+    padding: var(--spacing-3);
+    background-color: var(--neutral-white);
+    color: var(--neutral-black);
+    border-bottom: 1px solid var(--neutral-gray-200);
 }
 
 .cogni-llama-slider-header h2 {
     margin: 0;
-    font-size: 18px;
-    font-weight: 500;
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+
+.cogni-llama-slider-header img {
+    width: 24px;
+    height: 24px;
+    margin-right: var(--spacing-2);
 }
 
 #cogni-llama-close-slider {
     background: none;
     border: none;
-    color: white;
-    font-size: 24px;
+    color: var(--neutral-black);
+    font-size: 1.5rem;
+    line-height: 1;
     cursor: pointer;
     padding: 0;
-    width: 30px;
-    height: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
 }
 
-#cogni-llama-close-slider:hover {
-    background-color: rgba(255, 255, 255, 0.2);
+/* Tabs styling */
+.cogni-llama-tabs {
+    display: flex;
+    background-color: var(--neutral-white);
+    border-bottom: 1px solid var(--neutral-gray-200);
 }
 
-.cogni-llama-slider-content {
-    padding: 15px;
+.cogni-llama-tab {
+    flex: 1;
+    text-align: center;
+    padding: var(--spacing-2) 0;
+    cursor: pointer;
+    color: var(--neutral-gray-600);
+    font-weight: 500;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.cogni-llama-tab:hover {
+    color: var(--neutral-black);
+}
+
+.cogni-llama-tab.active {
+    color: var(--neutral-black);
+    border-bottom: 3px solid var(--primary-coral);
+}
+
+/* Tab content styling */
+.cogni-llama-tab-content {
+    display: none;
+    padding: var(--spacing-3);
+}
+
+.cogni-llama-tab-content.active {
+    display: block;
 }
 
 .cogni-llama-section {
-    margin-bottom: 20px;
+    margin-bottom: var(--spacing-4);
 }
 
 .cogni-llama-section h3 {
-    margin: 0 0 10px 0;
-    font-size: 16px;
-    font-weight: 500;
-    color: #333;
+    margin: 0 0 var(--spacing-3) 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--neutral-black);
+    display: flex;
+    align-items: center;
+}
+
+.cogni-llama-section h3 i {
+    margin-right: var(--spacing-2);
+    color: var(--primary-coral);
 }
 
 .cogni-llama-control {
     display: flex;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: var(--spacing-3);
 }
 
 .cogni-llama-control label {
     flex: 0 0 100px;
-    font-size: 14px;
-    color: #555;
+    font-size: 0.875rem;
+    color: var(--neutral-black);
+    font-weight: 500;
 }
 
 .cogni-llama-control select,
 .cogni-llama-control input {
     flex: 1;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
+    padding: 0.5rem;
+    border: 1px solid var(--neutral-gray-300);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    background-color: var(--neutral-white);
+    color: var(--neutral-black);
+    appearance: none;
 }
 
-.cogni-llama-buttons {
+.cogni-llama-control select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23000000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 16px;
+    padding-right: 2rem;
+}
+
+.cogni-llama-control select:focus,
+.cogni-llama-control input:focus {
+    outline: none;
+    border-color: var(--primary-coral);
+}
+
+/* Option cards styling - updated to match Image 2 with colorful cards */
+.cogni-llama-option-cards {
     display: flex;
-    gap: 10px;
-    margin-top: 15px;
+    flex-direction: column;
+    gap: var(--spacing-2);
+    margin-bottom: var(--spacing-3);
 }
 
-.cogni-llama-buttons button {
-    flex: 1;
-    padding: 10px;
-    border: none;
-    border-radius: 4px;
-    font-size: 14px;
+.cogni-llama-option-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-3);
+    background-color: var(--neutral-gray-100);
+    border-radius: var(--radius-md);
     cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--neutral-black);
+    border: 1px solid var(--neutral-gray-200);
+}
+
+/* Alternating colors for option cards */
+.cogni-llama-option-card:nth-child(6n+1) {
+    background-color: var(--primary-yellow);
+}
+
+.cogni-llama-option-card:nth-child(6n+2) {
+    background-color: var(--primary-teal);
+}
+
+.cogni-llama-option-card:nth-child(6n+3) {
+    background-color: var(--primary-coral);
+}
+
+.cogni-llama-option-card:nth-child(6n+4) {
+    background-color: var(--primary-mint);
+}
+
+.cogni-llama-option-card:nth-child(6n+5) {
+    background-color: var(--accent-blue);
+}
+
+.cogni-llama-option-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.cogni-llama-option-card.selected {
+    border: 2px solid var(--neutral-black);
+    box-shadow: var(--shadow-md);
+}
+
+.cogni-llama-option-card i {
+    margin-right: var(--spacing-3);
+    font-size: 1rem;
+    color: var(--neutral-black);
+}
+
+.cogni-llama-option-card span {
+    font-weight: 500;
+    color: var(--neutral-black);
+}
+
+.cogni-llama-edit-icon {
+    position: absolute;
+    right: var(--spacing-2);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--neutral-black);
+    cursor: pointer;
+    font-size: 0.875rem;
+    padding: 5px;
     transition: background-color 0.2s;
 }
 
-#cogni-llama-apply-settings {
-    background-color: #4a86e8;
-    color: white;
+/* Slider styling */
+.cogni-llama-slider-container {
+    margin-bottom: var(--spacing-4);
 }
 
-#cogni-llama-apply-settings:hover {
-    background-color: #3a76d8;
+.cogni-llama-slider-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-2);
+    color: var(--neutral-black);
+    font-size: 0.875rem;
 }
 
-#cogni-llama-simplify-page {
-    background-color: #34a853;
-    color: white;
+.cogni-llama-range-slider {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--neutral-gray-300);
+    outline: none;
+    border-radius: 4px;
+    margin: var(--spacing-2) 0;
 }
 
-#cogni-llama-simplify-page:hover {
-    background-color: #2d9348;
+.cogni-llama-range-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--primary-coral);
+    cursor: pointer;
+    border: 2px solid var(--neutral-white);
+    box-shadow: var(--shadow-sm);
+}
+
+.cogni-llama-range-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--primary-coral);
+    cursor: pointer;
+    border: 2px solid var(--neutral-white);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Custom prompt area */
+.cogni-llama-custom-prompt-area {
+    padding: var(--spacing-3);
+    background-color: var(--neutral-gray-100);
+    border-radius: var(--radius-md);
+    margin-top: var(--spacing-3);
+    transition: all 0.3s ease;
+    border: 1px solid var(--neutral-gray-300);
+}
+
+.cogni-llama-custom-prompt-area.hidden {
+    display: none;
+}
+
+.cogni-llama-custom-prompt-area textarea {
+    width: 100%;
+    height: 80px;
+    padding: var(--spacing-2);
+    border: 1px solid var(--neutral-gray-300);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    resize: vertical;
+    margin-bottom: var(--spacing-2);
+    font-family: var(--font-sans);
+    background-color: var(--neutral-white);
+    color: var(--neutral-black);
+}
+
+.cogni-llama-custom-prompt-area textarea:focus {
+    outline: none;
+    border-color: var(--primary-coral);
+}
+
+/* Button styling */
+.cogni-llama-button {
+    padding: 0.75rem 1rem;
+    border: none;
+    border-radius: var(--radius-pill);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-2);
+    background-color: var(--neutral-gray-200);
+    color: var(--neutral-black);
+}
+
+.cogni-llama-button:hover {
+    background-color: var(--neutral-gray-300);
+    transform: translateY(-1px);
+}
+
+.cogni-llama-primary-button {
+    background-color: var(--primary-coral);
+    color: var(--neutral-white);
+}
+
+.cogni-llama-primary-button:hover {
+    background-color: #e06c50;
+    box-shadow: var(--shadow-md);
+}
+
+.cogni-llama-primary-button:disabled {
+    background-color: var(--neutral-gray-300);
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.cogni-llama-buttons {
+    padding: var(--spacing-3);
+    margin-top: auto;
+    position: sticky;
+    bottom: 0;
+    background-color: var(--neutral-white);
+    border-top: 1px solid var(--neutral-gray-200);
+}
+
+.cogni-llama-simplify-text {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+    background-color: var(--neutral-black);
+    border-radius: var(--radius-pill);
+}
+
+.cogni-llama-simplify-text:hover {
+    background-color: #333;
+}
+
+/* Loader animation */
+.loader {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+    margin-left: var(--spacing-2);
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Shortcut key display */
+.cogni-llama-shortcut-keys {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: var(--radius-pill);
+    background-color: var(--neutral-gray-100);
+    border: 1px solid var(--neutral-gray-300);
+    font-size: 0.75rem;
+    color: var(--neutral-black);
 }
 
 /* Responsive adjustments for smaller screens */
 @media (max-width: 600px) {
     .cogni-llama-slider {
-        width: 300px;
-    }
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-    .cogni-llama-slider {
-        background-color: #292929;
-        color: #e0e0e0;
+        width: 85vw;
+        left: -85vw;
     }
     
-    .cogni-llama-section h3 {
-        color: #e0e0e0;
+    @keyframes slideInFromLeft {
+        0% {
+            left: -85vw;
+            opacity: 0.7;
+        }
+        100% {
+            left: 0;
+            opacity: 1;
+        }
     }
     
-    .cogni-llama-control label {
-        color: #b0b0b0;
-    }
-    
-    .cogni-llama-control select,
-    .cogni-llama-control input {
-        background-color: #3a3a3a;
-        border-color: #444;
-        color: #e0e0e0;
+    @keyframes slideOutToLeft {
+        0% {
+            left: 0;
+            opacity: 1;
+        }
+        100% {
+            left: -85vw;
+            opacity: 0.7;
+        }
     }
 }
