@@ -1,4 +1,4 @@
-// Configuration settings for Cogni-llama extension
+// Configuration settings for CogniLlama extension
 const config = {
     // Together AI API configuration
     togetherAI: {

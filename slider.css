@@ -4,7 +4,7 @@
 
 :root {
     /* Primary colors - updated to match Image 2 */
-    --primary-coral: #f47c5d;
+    --primary-coral: #58b2f6;
     --primary-yellow: #ffd24c;
     --primary-teal: #a8e6cf;
     --primary-mint: #ddf5e3;
@@ -20,7 +20,7 @@
     
     /* Accent colors */
     --accent-green: #59c692;
-    --accent-blue: #75c7fc;
+    --accent-blue: #f47c5d;
     --accent-red: #f47c5d;
     
     /* Shadows */
@@ -50,7 +50,7 @@
     left: -350px; /* Starting position off-screen */
     width: 350px;
     height: 100vh;
-    background-color: var(--neutral-white);
+    background-color: var(--neutral-black);
     box-shadow: var(--shadow-lg);
     z-index: 2147483647; /* Maximum z-index value */
     transition: left 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -59,6 +59,9 @@
     box-sizing: border-box;
     transform: translateZ(0); /* Hardware acceleration */
     color: var(--neutral-black);
+    border-top-right-radius: var(--radius-lg);
+    border-bottom-right-radius: var(--radius-lg);
+
 }
 
 .cogni-llama-slider.visible {
@@ -95,12 +98,20 @@
 
 .cogni-llama-slider-header {
     display: flex;
+    flex-direction: column;
+    width: 100%;
+    background-color: var(--neutral-white);
+    overflow: hidden;
+}
+
+.cogni-llama-header-main {
+    display: flex;
     justify-content: space-between;
     align-items: center;
     padding: var(--spacing-3);
-    background-color: var(--neutral-white);
-    color: var(--neutral-black);
-    border-bottom: 1px solid var(--neutral-gray-200);
+    background-color: var(--neutral-black);
+    color: var(--neutral-white);
+    width: 100%;
 }
 
 .cogni-llama-slider-header h2 {
@@ -109,18 +120,23 @@
     font-weight: 600;
     display: flex;
     align-items: center;
+    color: var(--neutral-white);
 }
 
 .cogni-llama-slider-header img {
-    width: 24px;
-    height: 24px;
+    width: 36px;
+    height: 36px;
     margin-right: var(--spacing-2);
+    border-radius: 50%; /* Make the logo circular */
+    object-fit: cover; /* Ensure the image fills the circular container */
+    object-position: center; /* Center the image within the circular container */
+    border: 2px solid var(--neutral-white); /* Add a white border */
 }
 
 #cogni-llama-close-slider {
     background: none;
     border: none;
-    color: var(--neutral-black);
+    color: var(--neutral-white);
     font-size: 1.5rem;
     line-height: 1;
     cursor: pointer;
@@ -128,6 +144,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: transform 0.2s ease;
+}
+
+#cogni-llama-close-slider:hover {
+    transform: scale(1.1);
 }
 
 /* Tabs styling */
@@ -135,33 +156,49 @@
     display: flex;
     background-color: var(--neutral-white);
     border-bottom: 1px solid var(--neutral-gray-200);
+    padding: 0.75rem 1rem 0;
+    position: relative;
+    border-top-left-radius: var(--radius-md);
+    border-top-right-radius: var(--radius-md);
 }
 
 .cogni-llama-tab {
     flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-1);
     text-align: center;
     padding: var(--spacing-2) 0;
     cursor: pointer;
     color: var(--neutral-gray-600);
     font-weight: 500;
-    font-size: 1rem;
+    font-size: 0.95rem;
     transition: all 0.2s ease;
     position: relative;
+    border-bottom: 3px solid transparent;
 }
 
-.cogni-llama-tab:hover {
-    color: var(--neutral-black);
+.cogni-llama-tab i {
+    font-size: 1.1rem;
+    margin-right: 6px;
+    color: var(--primary-coral);
 }
 
 .cogni-llama-tab.active {
-    color: var(--neutral-black);
+    color: var(--primary-coral);
     border-bottom: 3px solid var(--primary-coral);
+}
+
+.cogni-llama-tab:hover:not(.active) {
+    color: var(--neutral-gray-800);
 }
 
 /* Tab content styling */
 .cogni-llama-tab-content {
     display: none;
     padding: var(--spacing-3);
+    background-color: var(--neutral-white);
 }
 
 .cogni-llama-tab-content.active {
@@ -248,7 +285,7 @@
 
 /* Alternating colors for option cards */
 .cogni-llama-option-card:nth-child(6n+1) {
-    background-color: var(--primary-yellow);
+    background-color: var(--primary-coral);
 }
 
 .cogni-llama-option-card:nth-child(6n+2) {
@@ -256,16 +293,22 @@
 }
 
 .cogni-llama-option-card:nth-child(6n+3) {
-    background-color: var(--primary-coral);
+    background-color: var(--primary-mint);
 }
 
 .cogni-llama-option-card:nth-child(6n+4) {
-    background-color: var(--primary-mint);
+    background-color: var(--primary-yellow);
+
 }
 
 .cogni-llama-option-card:nth-child(6n+5) {
     background-color: var(--accent-blue);
 }
+
+.cogni-llama-option-card:nth-child(6n+6) {
+    background-color: var(--neutral-gray-300);
+}
+
 
 .cogni-llama-option-card:hover {
     transform: translateY(-2px);
@@ -418,24 +461,145 @@
 }
 
 .cogni-llama-buttons {
-    padding: var(--spacing-3);
-    margin-top: auto;
     position: sticky;
     bottom: 0;
+    padding: var(--spacing-3);
+    margin-top: auto;
     background-color: var(--neutral-white);
     border-top: 1px solid var(--neutral-gray-200);
+    z-index: 1; /* Ensure content appears above the glow effect */
 }
 
+/* Glow effect container */
+.cogni-llama-buttons::after {
+    content: '';
+    position: absolute;
+    top: 12px;
+    left: 15px;
+    right: 15px;
+    bottom: 12px;
+    z-index: -1;
+    background: linear-gradient(90deg, #6f42c1, #4776e6, #8e54e9, #2ceafd, #58b2f6);
+    background-size: 400% 100%;
+    filter: blur(12px);
+    opacity: 0.4;
+    animation: 
+        gradientShift 8s ease infinite,
+        pulse 4s ease-in-out infinite;
+    border-radius: var(--radius-pill);
+    pointer-events: none;
+}
+
+/* Animated Metallic Gradient Button - Modern style with glow effect */
 .cogni-llama-simplify-text {
+    background-color: var(--neutral-black);
+    color: white;
+    border: 2px solid transparent;
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+    transition: all 0.4s ease;
+    box-shadow: 0 5px 20px rgba(30, 60, 180, 0.2);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    border-radius: var(--radius-pill);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
     width: 100%;
     padding: 0.75rem;
     font-size: 1rem;
+}
+
+/* Create animated border effect */
+.cogni-llama-simplify-text::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(90deg, #6f42c1, #4776e6, #8e54e9, #2ceafd, #58b2f6);
+    background-size: 400% 100%;
+    z-index: -2;
+    animation: gradientShift 8s ease infinite;
+    border-radius: inherit;
+}
+
+/* Black background overlay to keep button black */
+.cogni-llama-simplify-text::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    right: 2px;
+    bottom: 2px;
     background-color: var(--neutral-black);
-    border-radius: var(--radius-pill);
+    z-index: -1;
+    border-radius: calc(var(--radius-pill) - 2px);
 }
 
 .cogni-llama-simplify-text:hover {
-    background-color: #333;
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+}
+
+.cogni-llama-simplify-text:hover::before {
+    animation: gradientShift 4s ease infinite;
+}
+
+.cogni-llama-buttons:hover::after {
+    opacity: 0.6;
+    filter: blur(15px);
+}
+
+.cogni-llama-simplify-text:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.cogni-llama-simplify-text i {
+    margin-right: 6px;
+    transform: scale(1.2);
+}
+
+@keyframes pulse {
+    0% {
+        filter: blur(12px);
+        opacity: 0.4;
+    }
+    50% {
+        filter: blur(18px);
+        opacity: 0.6;
+    }
+    100% {
+        filter: blur(12px);
+        opacity: 0.4;
+    }
+}
+
+@keyframes gradientShift {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* Override default primary button styles for the Llama Magic button */
+.cogni-llama-primary-button.cogni-llama-simplify-text {
+    background: linear-gradient(90deg, #6f42c1, #4776e6, #8e54e9, #2ceafd, #58b2f6);
+    background-size: 300% 100%;
+    background-position: 0% 50%;
+    color: white !important;
+}
+
+.cogni-llama-primary-button.cogni-llama-simplify-text:hover {
+    background: linear-gradient(90deg, #6f42c1, #4776e6, #8e54e9, #2ceafd, #58b2f6);
+    background-size: 300% 100%;
+    background-position: 100% 50%;
 }
 
 /* Loader animation */
@@ -462,6 +626,17 @@
     background-color: var(--neutral-gray-100);
     border: 1px solid var(--neutral-gray-300);
     font-size: 0.75rem;
+    color: var(--neutral-black);
+}
+
+/* Visual Clarity highlighting style */
+.highlighted {
+    background-color: rgb(255, 210, 77, 0.7); /* Light yellow background with 0.7 opacity */
+    padding: 0 2px;
+    border-radius: 3px;
+    font-weight: 500; /* Slightly bold */
+    display: inline;
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.1);
     color: var(--neutral-black);
 }
 

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Cogni-llama",
+  "name": "CogniLlama",
   "version": "1.0",
   "description": "Enhances web accessibility by simplifying text content using Together AI's Llama 4 model",
   "action": {

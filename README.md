@@ -1,8 +1,8 @@
-# Cogni-llama - Making Web Content More Accessible
+# CogniLlama - Making Web Content More Accessible
 
-<img src="/api/placeholder/120/120" alt="Cogni-llama Logo" />
+<img src="/api/placeholder/120/120" alt="CogniLlama Logo" />
 
-Cogni-llama is a Chrome extension that makes web content more accessible for readers with different reading needs. It simplifies complex web content while preserving the complete reading experience, making information more digestible for users with cognitive diversity.
+CogniLlama is a Chrome extension that makes web content more accessible for readers with different reading needs. It simplifies complex web content while preserving the complete reading experience, making information more digestible for users with cognitive diversity.
 
 ## 🌟 Key Features
 
@@ -12,9 +12,9 @@ Cogni-llama is a Chrome extension that makes web content more accessible for rea
 - **Accessibility-First Design**: Comprehensive text customization options including OpenDyslexic font support
 - **Real-Time Adjustments**: Instantly apply text formatting changes for the most comfortable reading experience
 
-## 🎯 Why Cogni-llama?
+## 🎯 Why CogniLlama?
 
-Unlike traditional text summarizers, Cogni-llama is designed to preserve the complete reading experience. We believe everyone deserves to enjoy the full journey of reading while having content presented in a way that works best for them. Cogni-llama adapts the text presentation without sacrificing content or context.
+Unlike traditional text summarizers, CogniLlama is designed to preserve the complete reading experience. We believe everyone deserves to enjoy the full journey of reading while having content presented in a way that works best for them. CogniLlama adapts the text presentation without sacrificing content or context.
 
 ## 🚀 Installation
 
@@ -24,7 +24,7 @@ Unlike traditional text summarizers, Cogni-llama is designed to preserve the com
 2. Generate an API key from your account dashboard
 3. Keep this key handy for the extension setup
 
-### Step 2: Install Cogni-llama Extension
+### Step 2: Install CogniLlama Extension
 
 1. Clone the repository:
    ```bash
@@ -39,7 +39,7 @@ Unlike traditional text summarizers, Cogni-llama is designed to preserve the com
 
 ### Step 3: Configure Your API Key
 
-1. Click on the Cogni-llama extension icon
+1. Click on the CogniLlama extension icon
 2. Go to Settings (gear icon)
 3. Enter your Together AI API key
 4. Save your settings
@@ -47,6 +47,7 @@ Unlike traditional text summarizers, Cogni-llama is designed to preserve the com
 ## ⚙️ Features in Detail
 
 ### Text Simplification
+
 - Three simplification levels (Low, Mid, High)
 - Optimization options:
   - General Reading Support
@@ -54,6 +55,7 @@ Unlike traditional text summarizers, Cogni-llama is designed to preserve the com
   - Reading Processing Support
 
 ### Display Customization
+
 - OpenDyslexic font toggle
 - Multiple color themes:
   - Default
@@ -68,7 +70,8 @@ Unlike traditional text summarizers, Cogni-llama is designed to preserve the com
 
 ## 💡 How It Works
 
-Cogni-llama uses Together AI's Llama 4 model to process and simplify text content while maintaining meaning and context. The extension:
+CogniLlama uses Together AI's Llama 4 model to process and simplify text content while maintaining meaning and context. The extension:
+
 1. Analyzes the current webpage content
 2. Applies the selected simplification level
 3. Optimizes the text based on your chosen reading support option
@@ -82,6 +85,7 @@ MIT License
 ## ⚠️ Troubleshooting
 
 If you encounter any issues:
+
 1. Verify your API key is correctly entered
 2. Check your internet connection (required for API calls)
 3. Try refreshing the page before simplifying
