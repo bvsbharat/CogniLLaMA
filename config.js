@@ -1,17 +1,20 @@
-// Configuration settings for Cogni-llama extension
+// Configuration settings for CogniLlama extension
 const config = {
     // Together AI API configuration
     togetherAI: {
-        apiEndpoint: "https://api.together.xyz/v1/chat/completions",
-        model: "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+        apiEndpoint: "https://api.llama.com/v1/chat/completions",
+        model: "Llama-4-Maverick-17B-128E-Instruct-FP8",
         stream: false,
-        defaultApiKey: "f2082dc55d67c63c00e0ecc647e3e5337887254acfa8d4f9a162cbbfb201779f" // Default API key
+        defaultApiKey: "LLM|3030097687151202|IfrN-xJ3UY-ikp8PzpOlEICU7x0"
     },
     // Simplification levels configuration
     simplificationLevelsConfig: {
-        levels: 3 // Number of simplification levels (Low, Mid, High)
+        levels: 2 // Number of simplification levels (Low, Mid, High)
     }
 };
 
 // Make simplificationLevelsConfig available globally for backward compatibility
 const simplificationLevelsConfig = config.simplificationLevelsConfig;
+
+// Make config available globally
+window.config = config;

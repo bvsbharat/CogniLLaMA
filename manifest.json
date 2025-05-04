@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Cogni-llama",
+  "name": "CogniLlama",
   "version": "1.0",
   "description": "Enhances web accessibility by simplifying text content using Together AI's Llama 4 model",
   "action": {
@@ -19,7 +19,7 @@
     "tabs"
   ],
   "host_permissions": [
-    "https://api.together.xyz/*",
+    "https://api.llama.com/*",
     "<all_urls>"
   ],
   "content_scripts": [
@@ -35,7 +35,7 @@
     "service_worker": "background.js"
   },
   "web_accessible_resources": [{
-    "resources": ["fonts/*", "config.js", "slider.js", "popup.html", "popup.js", "popup.css", "slider.css", "images/*"],
+    "resources": ["fonts/*", "config.js", "popup.html", "popup.js", "popup.css", "slider.css", "images/*"],
     "matches": ["<all_urls>"]
   }],
   "commands": {

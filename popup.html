@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Cogni-llama</title>
+    <title>CogniLlama</title>
     <link rel="stylesheet" href="popup.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -39,7 +39,7 @@
             <header>
                 <div class="title">
                     <img src="images/icon48.png" alt="Cogni Icon" class="cogni-icon">
-                    <h1>Cogni-llama</h1>
+                    <h1>CogniLlama</h1>
                 </div>
                 <div class="header-controls">
                     <div class="language-icon-container">
@@ -55,10 +55,12 @@
                                 <option value="de">German</option>
                                 <option value="it">Italian</option>
                                 <option value="pt">Portuguese</option>
-                                <option value="ru">Russian</option>
-                                <option value="zh">Chinese</option>
-                                <option value="ja">Japanese</option>
+                                <option value="ar">Arabic</option>
                                 <option value="hi">Hindi</option>
+                                <option value="id">Indonesian</option>
+                                <option value="tl">Tagalog</option>
+                                <option value="th">Thai</option>
+                                <option value="vi">Vietnamese</option>
                             </select>
                         </div>
                     </div>
@@ -74,40 +76,35 @@
                     <i id="helpIconOptimize" class="fa-solid fa-circle-question help-icon hidden" aria-expanded="false"></i>
                 </h2>
                 <div class="optimization-options">
-                    <div class="option-card" data-value="textClarity">
-                        <i class="fa-solid fa-lightbulb"></i>
-                        <span>Mind Illuminator</span>
-                    </div>
-                    <div class="option-card selected" data-value="focusStructure">
-                        <i class="fa-solid fa-eye"></i>
-                        <span>Visual Symphony</span>
-                    </div>
-                    <div class="option-card" data-value="wordPattern">
-                        <i class="fa-solid fa-book-open"></i>
-                        <span>Flow Maestro</span>
-                    </div>
-                    <div class="option-card" data-value="academicStyle">
-                        <i class="fa-solid fa-graduation-cap"></i>
-                        <span>Academic Scholar</span>
-                    </div>
-                    <div class="option-card" data-value="technicalExplanation">
-                        <i class="fa-solid fa-code"></i>
-                        <span>Tech Explainer</span>
-                    </div>
                     <div class="option-card" data-value="customPrompt">
                         <i class="fa-solid fa-magic"></i>
                         <span>Custom Mode</span>
                         <i id="editCustomPrompt" class="fa-solid fa-edit edit-icon"></i>
                     </div>
+                    <div class="option-card" data-value="eli5Simplify">
+                        <i class="fa-solid fa-child"></i>
+                        <span>ELI5 Simplify</span>
+                    </div>
+                    <div class="option-card" data-value="visualClarity">
+                        <i class="fa-solid fa-eye"></i>
+                        <span>Visual Clarity</span>
+                    </div>
+                    <div class="option-card" data-value="mindIlluminator">
+                        <i class="fa-solid fa-lightbulb"></i>
+                        <span>Mind Illuminator</span>
+                    </div>
+                    <div class="option-card" data-value="techExplainer">
+                        <i class="fa-solid fa-code"></i>
+                        <span>Tech Explainer</span>
+                    </div>
                 </div>
                 <div id="optimizeGuide" class="optimize-guide">
                     <ul>
-                        <li>Mind Illuminator: Simplifies complex text for better understanding</li>
-                        <li>Visual Symphony: Organizes content with better structure for focus</li>
-                        <li>Flow Maestro: Improves readability with consistent patterns</li>
-                        <li>Academic Scholar: Transforms text into scholarly academic style</li>
-                        <li>Tech Explainer: Provides clear technical explanations</li>
                         <li>Custom Mode: Use your own custom prompt instructions</li>
+                        <li>ELI5 Simplify: Simplifies complex text for better understanding</li>
+                        <li>Visual Clarity: Organizes content with better structure for focus</li>
+                        <li>Mind Illuminator: Improves readability with consistent patterns</li>
+                        <li>Tech Explainer: Provides clear technical explanations</li>
                     </ul>
                 </div>
                 <div id="customPromptArea" class="custom-prompt-area hidden">
