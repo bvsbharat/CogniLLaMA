@@ -1,6 +1,6 @@
 function initializePopup() {
     // Restore selected simplification level and font settings
-    chrome.storage.sync.get(['simplificationLevel', 'optimizeFor', 'fontEnabled', 'selectedLanguage'], function(result) {
+    chrome.storage.sync.get(['simplificationLevel', 'optimizeFor', 'selectedFont', 'selectedLanguage'], function(result) {
         const level = result.simplificationLevel || '3'; // Default to '3' for "Mid"
         const slider = document.getElementById('simplificationSlider');
         if (slider) {
@@ -21,8 +21,11 @@ function initializePopup() {
             languageSelector.value = result.selectedLanguage || 'original';
         }
         
-        // Restore font toggle state
-        document.getElementById('fontToggle').checked = result.fontEnabled || false;
+        // Restore font selection
+        const fontSelector = document.getElementById('fontSelector');
+        if (fontSelector) {
+            fontSelector.value = result.selectedFont || 'default';
+        }
     });
 
     // Restore theme, toggle and slider states
@@ -40,8 +43,11 @@ function initializePopup() {
         document.getElementById('wordSpacingValue').textContent = (result.wordSpacing || 0) + 'px';
     });
     
-    chrome.storage.sync.get(['fontEnabled'], function(result) {
-        document.getElementById('fontToggle').checked = result.fontEnabled || false;
+    chrome.storage.sync.get(['selectedFont'], function(result) {
+        const fontSelector = document.getElementById('fontSelector');
+        if (fontSelector) {
+            fontSelector.value = result.selectedFont || 'default';
+        }
     });
 }
 
@@ -240,7 +246,7 @@ function notifyConfigChange(isSimplificationChange = false) {
                     config: {
                         simplificationLevel: document.getElementById('simplificationSlider').value,
                         optimizeFor: document.querySelector('.option-card.selected').getAttribute('data-value'),
-                        fontEnabled: document.getElementById('fontToggle').checked,
+                        fontEnabled: document.getElementById('fontSelector').value !== 'default',
                         selectedLanguage: document.getElementById('languageSelector').value,
                         customPromptText: customResult.customPromptText || ''
                     },
@@ -316,14 +322,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Reset to Defaults button handler
     document.getElementById('resetDefaults').addEventListener('click', function() {
         chrome.storage.sync.set({
-            fontEnabled: false,
+            selectedFont: 'default',
             selectedTheme: 'default',
             lineSpacing: 1,
             letterSpacing: 0,
             wordSpacing: 0
         }, function() {
             // Update the UI elements
-            document.getElementById('fontToggle').checked = false;
+            document.getElementById('fontSelector').value = 'default';
             document.getElementById('themeSelector').value = 'default';
 
             document.getElementById('lineSpacing').value = 1.5;
@@ -341,6 +347,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Reset font
                     chrome.tabs.sendMessage(tabs[0].id, {
                         action: 'toggleFont',
+                        fontName: 'default',
                         enabled: false
                     });
 
@@ -402,45 +409,38 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // OpenDyslexic font toggle handler
-    const fontToggle = document.getElementById('fontToggle');
-    
-    // Request current font state when popup opens
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-        if (tabs[0] && /^https?:/.test(tabs[0].url)) {
-            chrome.tabs.sendMessage(tabs[0].id, { action: 'getFontState' }, function(response) {
-                if (chrome.runtime.lastError) {
-                    console.error("Could not get font state:", chrome.runtime.lastError.message);
-                    fontToggle.checked = false; // Default to unchecked
-                } else if (response && response.fontEnabled !== undefined) {
-                    fontToggle.checked = response.fontEnabled;
-                }
-            });
-        } else {
-            console.warn("Active tab is not a valid web page. Cannot get font state.");
-            fontToggle.checked = false; // Default to unchecked
-        }
-    });
-
-    fontToggle.addEventListener('change', function(e) {
-        const enabled = e.target.checked;
+    // Font Selector Handler
+    const fontSelector = document.getElementById('fontSelector');
+    fontSelector.addEventListener('change', function(e) {
+        const selectedFont = e.target.value;
+        console.log('Font selected:', selectedFont);
+        console.log('Font selector value:', this.value);
         
-        // Save preference
-        chrome.storage.sync.set({ fontEnabled: enabled });
+        // Save the selected font
+        chrome.storage.sync.set({ selectedFont: selectedFont }, function() {
+            console.log('Font preference saved:', selectedFont);
+        });
         
         // Apply to current tab
         chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
             if (tabs[0] && /^https?:/.test(tabs[0].url)) {
-                chrome.tabs.sendMessage(tabs[0].id, {
+                console.log('Sending font change message to tab:', tabs[0].id);
+                const message = {
                     action: 'toggleFont',
-                    enabled: enabled
-                }, function(response) {
+                    fontName: selectedFont,
+                    enabled: selectedFont !== 'default'
+                };
+                console.log('Message being sent:', JSON.stringify(message));
+                
+                chrome.tabs.sendMessage(tabs[0].id, message, function(response) {
                     if (chrome.runtime.lastError) {
-                        console.error('Could not toggle font:', chrome.runtime.lastError.message);
+                        console.error('Could not change font:', chrome.runtime.lastError.message);
+                    } else {
+                        console.log('Font changed successfully:', response);
                     }
                 });
             } else {
-                console.warn("Active tab is not a valid web page. Cannot toggle font.");
+                console.warn("Active tab is not a valid web page. Cannot change font.");
             }
         });
     });

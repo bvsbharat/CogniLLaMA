@@ -179,15 +179,21 @@
                 <i class="fas fa-desktop"></i> Display
             </h2>
             
-            <div class="toggle-container">
-                <span class="toggle-label">OpenDyslexic Font</span>
-                <label class="toggle">
-                    <input type="checkbox" id="fontToggle">
-                    <span class="slider round"></span>
-                </label>
+            <div class="dropdown-container">
+                <label for="fontSelector">Font Style</label>
+                <select id="fontSelector">
+                    <option value="default">Default</option>
+                    <option value="verdana">Verdana</option>
+                    <option value="opensans">Open Sans</option>
+                    <option value="comicsans">Comic Sans</option>
+                    <option value="bbc">BBC Reith</option>
+                    <option value="carnaby">Carnaby Street</option>
+                    <option value="opendyslexic">OpenDyslexic</option>
+                </select>
             </div>
 
             <div class="dropdown-container">
+                <label for="themeSelector">Theme</label>
                 <select id="themeSelector">
                     <option value="creamPaper">Cream Paper</option>
                     <option value="default">Default</option>

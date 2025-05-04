@@ -338,7 +338,7 @@ function getTranslatedExample(language) {
         'es': 'Cómo piensa el cerebro sigue siendo un misterio para la neurociencia moderna.',
         'fr': 'Comment le cerveau pense reste un mystère pour la neuroscience moderne.',
         'de': 'Wie das Gehirn denkt, ist für die moderne Neurowissenschaft immer noch ein Rätsel.',
-        'it': 'Come funziona il pensiero nel cervello è ancora un mistero per la neuroscienza moderna.',
+        'it': 'Come funziona il pensiero nel cervello è ancora un misterio per la neuroscienza moderna.',
         'pt': 'Como o cérebro pensa ainda é um mistério para a neurociência moderna.',
         'ru': 'Как работает мышление в мозге до сих пор остается загадкой для современной нейронауки.',
         'zh': '大脑如何思考对现代神经科学来说仍然是个谜。',
@@ -501,7 +501,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                             if (el.hasAttribute('data-original-text')) {
                                 const originalText = el.getAttribute('data-original-text');
                                 el.textContent = originalText;
-                                console.log('Restored element to original text');
+                                // Remove the data attribute to ensure it can be processed again
+                                el.removeAttribute('data-original-text');
+                                el.removeAttribute('data-simplified');
+                                console.log('Restored element to original text and removed attributes');
                             }
                         });
                         
@@ -678,25 +681,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                             for (let i = 0; i < textElements.length; i++) {
                                 const element = textElements[i].element;
                                 
-                                // Skip if already processed
-                                if (element.hasAttribute('data-simplified')) {
-                                    console.log(`Element ${i+1} already simplified, skipping`);
-                                    continue;
-                                }
+                                // We're removing this check to allow elements to be processed multiple times
+                                // This enables the user to apply simplification repeatedly
                                 
                                 // Find all text nodes in this element
-                                for (const child of element.childNodes) {
-                                    if (child.nodeType === Node.TEXT_NODE) {
-                                        const text = child.textContent.trim();
-                                        if (text.length > 30) {  // Only consider substantial text
-                                            allTextNodes.push({
-                                                node: child,
-                                                element: element,
-                                                text: text,
-                                                elementIndex: i
-                                            });
-                                        }
-                                    }
+                                const walker = document.createTreeWalker(
+                                    element,
+                                    NodeFilter.SHOW_TEXT,
+                                    { acceptNode: node => node.textContent.trim().length > 30 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT }
+                                );
+                                
+                                let currentNode;
+                                while (currentNode = walker.nextNode()) {
+                                    allTextNodes.push({
+                                        node: currentNode,
+                                        element: element,
+                                        text: currentNode.textContent,
+                                        elementIndex: i
+                                    });
                                 }
                             }
                             
@@ -794,10 +796,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     break;
                 
                 case "toggleFont":
-                    console.log("Toggling OpenDyslexic font...");
+                    console.log("Toggling font...", request);
+                    console.log("Font name received:", request.fontName);
+                    console.log("Font enabled:", request.enabled);
                     fontEnabled = request.enabled;
-                    toggleOpenDyslexicFont(fontEnabled);
-                    sendResponse({success: true});
+                    
+                    // Ensure we're using the correct font name
+                    if (typeof request.fontName === 'string') {
+                        applyFont(request.fontName.toLowerCase().trim());
+                    } else {
+                        console.error("Invalid font name received:", request.fontName);
+                    }
+                    
+                    sendResponse({success: true, appliedFont: request.fontName});
                     break;
                 
                 case "applyTheme":
@@ -874,56 +885,153 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep the message channel open for async response
 });
 
-// Function to toggle OpenDyslexic font
-function toggleOpenDyslexicFont(enabled) {
-    console.log(`${enabled ? 'Applying' : 'Removing'} OpenDyslexic font...`);
+// Function to apply selected font
+function applyFont(fontName) {
+    console.log(`Applying font: ${fontName}`);
+    console.log(`Font type: ${typeof fontName}`);
     
-    if (enabled) {
-        // Add font-face definition if it doesn't exist
-        if (!document.getElementById('opendyslexic-font-face')) {
-            const fontFaceStyle = document.createElement('style');
-            fontFaceStyle.id = 'opendyslexic-font-face';
-            fontFaceStyle.textContent = `
-                @font-face {
-                    font-family: 'OpenDyslexic';
-                    src: url('${chrome.runtime.getURL('fonts/OpenDyslexic-Regular.otf')}') format('opentype');
-                    font-weight: normal;
-                    font-style: normal;
-                    font-display: swap;
-                }
-            `;
-            document.head.appendChild(fontFaceStyle);
+    // Debug: Check if fontName is valid
+    if (!fontName || typeof fontName !== 'string') {
+        console.error('Invalid font name:', fontName);
+        return;
+    }
+    
+    // Remove any existing font styles
+    const existingFontStyle = document.getElementById('cogni-font-style');
+    if (existingFontStyle) {
+        existingFontStyle.parentNode.removeChild(existingFontStyle);
+    }
+    
+    // Remove any existing font imports
+    const existingFontImport = document.getElementById('cogni-font-import');
+    if (existingFontImport) {
+        existingFontImport.parentNode.removeChild(existingFontImport);
+    }
+    
+    // Remove any existing OpenDyslexic font-face definitions
+    const existingOpenDyslexic = document.getElementById('opendyslexic-font-face');
+    if (existingOpenDyslexic) {
+        existingOpenDyslexic.parentNode.removeChild(existingOpenDyslexic);
+    }
+    
+    // If default font is selected, just return after removing existing styles
+    if (fontName === 'default') {
+        console.log('Reverting to default font');
+        return;
+    }
+    
+    // Define font properties for each font type
+    const fontProperties = {
+        verdana: {
+            fontFamily: 'Verdana, sans-serif',
+            lineHeight: '1.5',
+            letterSpacing: '0.5px',
+            wordSpacing: '3px',
+            needsImport: false
+        },
+        opensans: {
+            fontFamily: '"Open Sans", sans-serif',
+            lineHeight: '1.6',
+            letterSpacing: '0.3px',
+            wordSpacing: '2px',
+            needsImport: true,
+            importUrl: 'https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap'
+        },
+        comicsans: {
+            fontFamily: '"Comic Sans MS", cursive',
+            lineHeight: '1.5',
+            letterSpacing: '0.5px',
+            wordSpacing: '4px',
+            needsImport: false
+        },
+        bbc: {
+            fontFamily: '"IBM Plex Sans", Arial, sans-serif',
+            lineHeight: '1.6',
+            letterSpacing: '0.2px',
+            wordSpacing: '2.5px',
+            needsImport: true,
+            importUrl: 'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap'
+        },
+        carnaby: {
+            fontFamily: '"Baloo 2", Arial, sans-serif',
+            lineHeight: '1.5',
+            letterSpacing: '0.4px',
+            wordSpacing: '3px',
+            needsImport: true,
+            importUrl: 'https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600&display=swap'
+        },
+        opendyslexic: {
+            fontFamily: 'OpenDyslexic, sans-serif',
+            lineHeight: '1.5',
+            letterSpacing: '0.5px',
+            wordSpacing: '3px',
+            needsImport: false
         }
-
-        // Create or update style element to apply font to entire page
-        let fontStyle = document.getElementById('opendyslexic-font-style');
-        if (!fontStyle) {
-            fontStyle = document.createElement('style');
-            fontStyle.id = 'opendyslexic-font-style';
-            document.head.appendChild(fontStyle);
-        }
-
-        fontStyle.textContent = `
-            body, body * {
-                font-family: 'OpenDyslexic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif !important;
-                line-height: 1.5;
-                letter-spacing: 0.5px;
-                word-spacing: 3px;
+    };
+    
+    console.log('Font properties available:', Object.keys(fontProperties));
+    console.log('Looking for font properties for:', fontName);
+    
+    const props = fontProperties[fontName];
+    if (!props) {
+        console.error(`Unknown font: ${fontName}`);
+        return;
+    }
+    
+    console.log('Found font properties:', props);
+    
+    // Import web font if needed
+    if (props.needsImport && props.importUrl) {
+        const fontImport = document.createElement('link');
+        fontImport.id = 'cogni-font-import';
+        fontImport.rel = 'stylesheet';
+        fontImport.href = props.importUrl;
+        document.head.appendChild(fontImport);
+        console.log(`Imported font from: ${props.importUrl}`);
+    }
+    
+    // Only add OpenDyslexic font-face if that specific font is selected
+    if (fontName === 'opendyslexic') {
+        const fontFaceStyle = document.createElement('style');
+        fontFaceStyle.id = 'opendyslexic-font-face';
+        fontFaceStyle.textContent = `
+            @font-face {
+                font-family: 'OpenDyslexic';
+                src: url('${chrome.runtime.getURL('fonts/OpenDyslexic-Regular.otf')}') format('opentype');
+                font-weight: normal;
+                font-style: normal;
+            }
+            @font-face {
+                font-family: 'OpenDyslexic';
+                src: url('${chrome.runtime.getURL('fonts/OpenDyslexic-Bold.otf')}') format('opentype');
+                font-weight: bold;
+                font-style: normal;
             }
         `;
-    } else {
-        // Remove the font style applied to the entire page
-        const fontStyle = document.getElementById('opendyslexic-font-style');
-        if (fontStyle) {
-            fontStyle.parentNode.removeChild(fontStyle);
-        }
-
-        // Optionally remove the font-face definition
-        const fontFaceStyle = document.getElementById('opendyslexic-font-face');
-        if (fontFaceStyle) {
-            fontFaceStyle.parentNode.removeChild(fontFaceStyle);
-        }
+        document.head.appendChild(fontFaceStyle);
+        console.log('Added OpenDyslexic font-face definitions');
     }
+    
+    // Create and apply the font style with !important to override existing styles
+    const fontStyle = document.createElement('style');
+    fontStyle.id = 'cogni-font-style';
+    
+    fontStyle.textContent = `
+        html, body, div, p, span, h1, h2, h3, h4, h5, h6, a, ul, ol, li, article, section, main, header, footer, nav, aside, button, input, textarea, select, label, table, tr, td, th {
+            font-family: ${props.fontFamily} !important;
+            line-height: ${props.lineHeight} !important;
+            letter-spacing: ${props.letterSpacing} !important;
+            word-spacing: ${props.wordSpacing} !important;
+        }
+    `;
+    document.head.appendChild(fontStyle);
+    console.log(`Applied font style: ${props.fontFamily}`);
+    
+    // Force a repaint to ensure the font is applied
+    document.body.style.visibility = 'hidden';
+    setTimeout(() => {
+        document.body.style.visibility = 'visible';
+    }, 50);
 }
 
 function enableHoverFeature() {
@@ -1067,6 +1175,15 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.sync.get(['selectedTheme'], function(result) {
         const selectedTheme = result.selectedTheme || 'default';
         applyTheme(selectedTheme);
+    });
+    
+    // Apply saved font
+    chrome.storage.sync.get(['selectedFont'], function(result) {
+        const selectedFont = result.selectedFont || 'default';
+        if (selectedFont !== 'default') {
+            console.log('Applying saved font:', selectedFont);
+            applyFont(selectedFont);
+        }
     });
     
     // Load and apply initial spacing settings
