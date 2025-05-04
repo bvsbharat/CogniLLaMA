@@ -943,6 +943,9 @@ async function simplifyContent(cognitiveMode = 'eli5Simplify', targetLanguage = 
                                     nodeInfo.element.innerHTML = simplifiedText;
                                     console.log(`Updated innerHTML for ${nodeId}`);
                                     
+                                    // Animate the updated element
+                                    animateContentUpdate(nodeInfo.element);
+                                    
                                     // Track the simplified element with HTML
                                     simplifiedElements.push({
                                         element: nodeInfo.element,
@@ -954,11 +957,17 @@ async function simplifyContent(cognitiveMode = 'eli5Simplify', targetLanguage = 
                                     console.error(`Error updating innerHTML for ${nodeId}:`, e);
                                     // Fallback to textContent if innerHTML fails
                                     nodeInfo.node.textContent = simplifiedText.replace(/<[^>]*>/g, '');
+                                    
+                                    // Animate the fallback text
+                                    animateContentUpdate(nodeInfo.node.parentElement || nodeInfo.node);
                                 }
                             } else {
                                 // For regular text nodes, replace the textContent
                                 nodeInfo.node.textContent = simplifiedText;
                                 console.log(`Updated textContent for ${nodeId}`);
+                                
+                                // Animate the text node's parent for visibility (text nodes can't be styled directly)
+                                animateContentUpdate(nodeInfo.element || nodeInfo.node.parentElement);
                                 
                                 // Track the simplified node
                                 simplifiedElements.push({
@@ -1016,6 +1025,17 @@ async function simplifyContent(cognitiveMode = 'eli5Simplify', targetLanguage = 
         console.error('Error simplifying content:', error);
         throw error;
     }
+}
+
+// Helper function to animate content updates
+function animateContentUpdate(element) {
+    // Add the animation class
+    element.classList.add('cogni-llama-content-updated');
+    
+    // Remove the class after animation completes to allow for future animations
+    setTimeout(() => {
+        element.classList.remove('cogni-llama-content-updated');
+    }, 1500); // slightly longer than animation duration to ensure it completes
 }
 
 // Listen for messages from popup
@@ -1441,30 +1461,52 @@ function applyTheme(themeName) {
 
 // Function to restore original content
 function restoreOriginalContent() {
+    console.log('Restoring original content...');
+    console.log(`Found ${simplifiedElements.length} elements to restore`);
+    
     if (simplifiedElements.length === 0) {
-        console.log('No simplified content to restore');
-        return false;
+        showNotification('No simplified content to restore');
+        return;
     }
     
-    console.log(`Restoring ${simplifiedElements.length} simplified elements to original content`);
-    
-    // Restore each simplified node directly
-    simplifiedElements.forEach(item => {
-        if (item.isHtml && item.element && item.original) {
-            // Restore HTML content
-            item.element.innerHTML = item.original;
-            console.log('Restored HTML element to original content');
-        } else if (item.node && item.original) {
-            // Restore the text node to its original content
-            item.node.textContent = item.original;
-            console.log('Restored text node to original content');
+    // Iterate through simplified elements in reverse order to handle nested elements correctly
+    for (let i = simplifiedElements.length - 1; i >= 0; i--) {
+        const item = simplifiedElements[i];
+        
+        try {
+            if (item.isHtml && item.element && item.element._originalHtml) {
+                // If this is an element with HTML, restore its original innerHTML
+                item.element.innerHTML = item.original;
+                // Animate the update
+                animateContentUpdate(item.element);
+            } else if (item.node) {
+                // For text nodes, restore original textContent
+                item.node.textContent = item.original;
+                // Animate the text update (on parent element for visibility)
+                animateContentUpdate(item.element || item.node.parentElement);
+            }
+            
+            // Remove the data-simplified attribute
+            if (item.element) {
+                item.element.removeAttribute('data-simplified');
+                item.element.removeAttribute('data-original-text');
+            }
+        } catch (e) {
+            console.error('Error restoring original content:', e);
         }
-    });
+    }
     
-    // Clear the simplified elements array
+    // Clear the simplified elements array after restoration
     window.simplifiedElements = [];
     
     // Show a notification
+    showNotification('Restored original content');
+    
+    return true;
+}
+
+// Function to show a notification
+function showNotification(message) {
     const notification = document.createElement('div');
     notification.style.position = 'fixed';
     notification.style.top = '20px';
@@ -1476,7 +1518,7 @@ function restoreOriginalContent() {
     notification.style.borderRadius = '5px';
     notification.style.zIndex = '9999';
     notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
-    notification.textContent = 'Restored original content';
+    notification.textContent = message;
     
     document.body.appendChild(notification);
     
@@ -1486,8 +1528,6 @@ function restoreOriginalContent() {
         notification.style.transition = 'opacity 0.5s';
         setTimeout(() => notification.remove(), 500);
     }, 3000);
-    
-    return true;
 }
 
 // Function to inject the slider resources and script
@@ -1598,9 +1638,9 @@ async function injectSlider() {
                             <h3><i class="fa-solid fa-sliders"></i> Level</h3>
                             <div class="cogni-llama-slider-container">
                                 <div class="cogni-llama-slider-labels">
-                                    <span>Simple</span>
-                                    <span>Balanced</span>
-                                    <span>Detailed</span>
+                                    <span>Min</span>
+                                    <span>Med</span>
+                                    <span>Max</span>
                                 </div>
                                 <input type="range" id="cogni-llama-simplification-slider" class="cogni-llama-range-slider" min="1" max="5" step="1" value="3">
                             </div>
@@ -1709,16 +1749,24 @@ async function injectSlider() {
     }
     
     // Toggle slider visibility
-    toggleSlider();
+    toggleSlider('left');
 }
 
 // Function to toggle slider visibility
-function toggleSlider() {
-    console.log("Toggling slider visibility...");
+function toggleSlider(side = 'left') {
+    console.log(`Toggling slider visibility (side: ${side})...`);
     const slider = document.querySelector('.cogni-llama-slider');
     if (slider) {
+        // Set the side class first, before toggling visibility
+        if (side === 'right') {
+            slider.classList.add('right-side');
+        } else {
+            slider.classList.remove('right-side');
+        }
+        
+        // Then toggle visibility
         slider.classList.toggle('visible');
-        console.log("Slider visibility toggled:", slider.classList.contains('visible'));
+        console.log("Slider visibility toggled:", slider.classList.contains('visible'), "Side:", side);
     } else {
         console.error("Slider element not found!");
     }
@@ -1749,6 +1797,20 @@ function initializeSliderFunctionality() {
         fontSizeSelector: !!fontSizeSelector,
         saveCustomPromptButton: !!saveCustomPromptButton,
         resetDefaultsButton: !!resetDefaultsButton
+    });
+    
+    // Add Escape key listener to close the slider
+    document.addEventListener('keydown', function(e) {
+        // Check if the Escape key was pressed
+        if (e.key === 'Escape') {
+            // Only act if slider is visible
+            const slider = document.querySelector('.cogni-llama-slider');
+            if (slider && slider.classList.contains('visible')) {
+                console.log('Escape key pressed - closing slider');
+                toggleSlider();
+                e.preventDefault(); // Prevent default browser escape behavior
+            }
+        }
     });
     
     // Close button functionality
@@ -1912,9 +1974,19 @@ function initializeSliderFunctionality() {
                 
                 // Show feedback to the user
                 saveCustomPromptButton.textContent = 'Saved!';
+                
+                // Hide the custom prompt area after saving
                 setTimeout(() => {
+                    // First restore the button text
                     saveCustomPromptButton.innerHTML = '<i class="fa-solid fa-save"></i> Save Custom Prompt';
-                }, 2000);
+                    
+                    // Then hide the custom prompt area
+                    const customPromptArea = document.getElementById('cogni-llama-custom-prompt-area');
+                    if (customPromptArea) {
+                        customPromptArea.classList.add('hidden');
+                        console.log('Custom prompt area hidden after save');
+                    }
+                }, 1000); // Shorter timing to make the UI feel more responsive
             }
         });
     }
@@ -1993,8 +2065,8 @@ function initializeSliderFunctionality() {
         simplifyButton.addEventListener('click', () => {
             console.log("Llama Magic button clicked");
             
-            // Show loading state
-            const originalButtonText = simplifyButton.innerHTML;
+            // Add loading state
+            const originalText = simplifyButton.innerHTML;
             simplifyButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
             simplifyButton.disabled = true;
             
@@ -2035,14 +2107,14 @@ function initializeSliderFunctionality() {
             simplifyContent(cognitiveMode, targetLanguage, simplificationLevel, customPrompt)
                 .then(() => {
                     // Restore button state
-                    simplifyButton.innerHTML = originalButtonText;
+                    simplifyButton.innerHTML = originalText;
                     simplifyButton.disabled = false;
                     console.log('Content simplification completed');
                 })
                 .catch(error => {
                     console.error('Error simplifying content:', error);
                     // Restore button state and show error
-                    simplifyButton.innerHTML = originalButtonText;
+                    simplifyButton.innerHTML = originalText;
                     simplifyButton.disabled = false;
                     alert(`Error: ${error.message}`);
                 });
@@ -2171,16 +2243,46 @@ function initializeSliderFunctionality() {
 }
 
 // Add a direct keyboard event listener to the document
-document.addEventListener('keydown', function(e) {
+document.addEventListener('keydown', async function(e) {  
     // Check for Cmd+Shift+L (Mac) or Ctrl+Shift+L (Windows/Linux)
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'l') {
         console.log('Direct keyboard shortcut detected: Command/Ctrl+Shift+L');
         if (!sliderInjected) {
             injectSlider();
         } else {
-            toggleSlider();
+            toggleSlider('left');
         }
         e.preventDefault(); // Prevent default browser behavior
+    }
+    
+    // Check for Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows/Linux) to open from the right
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'r') {
+        console.log('Direct keyboard shortcut detected: Command/Ctrl+Shift+R');
+        
+        // First make sure the slider is injected
+        if (!sliderInjected) {
+            // Inject the slider first
+            await injectSlider(); 
+        }
+        
+        // Now handle the slider positioning and visibility
+        const slider = document.querySelector('.cogni-llama-slider');
+        if (slider) {
+            // Force the right side positioning
+            slider.classList.add('right-side');
+            
+            // If not already visible, make it visible
+            if (!slider.classList.contains('visible')) {
+                slider.classList.add('visible');
+                console.log("Opened slider from right side");
+            } else {
+                // If it's already visible, toggle it off
+                slider.classList.remove('visible');
+                console.log("Closed slider from right side");
+            }
+        }
+        
+        e.preventDefault(); // Prevent default browser behavior (which would refresh the page)
     }
 });
 
@@ -2243,7 +2345,7 @@ cognitiveCards.forEach(card => {
 const simplifyButton = document.querySelector('#cogni-llama-simplify');
     
 simplifyButton.addEventListener('click', function() {
-    console.log('Llama Magic button clicked');
+    console.log("Llama Magic button clicked");
     
     // Add loading state
     const originalText = simplifyButton.innerHTML;
@@ -2276,13 +2378,21 @@ simplifyButton.addEventListener('click', function() {
     
     // Get selected language
     const languageSelector = document.getElementById('cogni-llama-language-selector');
-    const targetLanguage = languageSelector ? languageSelector.value : 'original';
-    console.log(`Target language: ${targetLanguage}`);
+    let targetLanguage = 'en'; // Default to English
+    
+    if (languageSelector) {
+        targetLanguage = languageSelector.value;
+        console.log(`Target language: ${targetLanguage}`);
+    }
     
     // Get simplification level
     const simplificationSlider = document.getElementById('cogni-llama-simplification-slider');
-    const simplificationLevel = simplificationSlider ? simplificationSlider.value : 3;
-    console.log(`Simplification level: ${simplificationLevel}`);
+    let simplificationLevel = 3; // Default to medium
+    
+    if (simplificationSlider) {
+        simplificationLevel = parseInt(simplificationSlider.value);
+        console.log(`Simplification level: ${simplificationLevel}`);
+    }
     
     // Call the simplifyContent function
     simplifyContent(cognitiveMode, targetLanguage, simplificationLevel, customPrompt)
