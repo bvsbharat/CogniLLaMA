@@ -127,17 +127,41 @@ async function simplifyTextWithTogetherAI(textItems, systemPrompt, selectedLangu
             'de': 'German (Deutsch)',
             'it': 'Italian (Italiano)',
             'pt': 'Portuguese (Português)',
-            'ru': 'Russian (Русский)',
-            'zh': 'Chinese (中文)',
-            'ja': 'Japanese (日本語)',
-            'hi': 'Hindi (हिन्दी)'
+            'ar': 'Arabic (العربية)',
+            'hi': 'Hindi (हिन्दी)',
+            'id': 'Indonesian (Bahasa Indonesia)',
+            'tl': 'Tagalog (Filipino)',
+            'th': 'Thai (ไทย)',
+            'vi': 'Vietnamese (Tiếng Việt)'
         };
         
         // Create a JSON structure with IDs and text content
+        // Check if the element has HTML content that needs to be preserved
         const textItemsJson = textItems.map((item, index) => {
+            // Check if this is a paragraph with HTML elements - more comprehensive check
+            const hasHtmlElements = item.element && (
+                // Check for any HTML tags within the element
+                item.element.innerHTML.includes('<') || 
+                // Or check for specific common HTML elements
+                item.element.getElementsByTagName('a').length > 0 || 
+                item.element.getElementsByTagName('strong').length > 0 ||
+                item.element.getElementsByTagName('em').length > 0 ||
+                item.element.getElementsByTagName('b').length > 0 ||
+                item.element.getElementsByTagName('i').length > 0 ||
+                item.element.getElementsByTagName('span').length > 0 ||
+                item.element.getElementsByTagName('sup').length > 0 ||
+                item.element.getElementsByTagName('sub').length > 0 ||
+                item.element.getElementsByTagName('cite').length > 0 ||
+                item.element.getElementsByTagName('code').length > 0 ||
+                item.element.getElementsByTagName('mark').length > 0
+            );
+            
             return {
                 id: `text_${index}`,
-                content: item.text
+                content: item.text,
+                hasHtml: hasHtmlElements,
+                // If it has HTML elements, include the innerHTML as well
+                htmlContent: hasHtmlElements ? item.element.innerHTML : null
             };
         });
         
@@ -158,19 +182,23 @@ CRITICAL INSTRUCTIONS:
 3. Simplify the text to make it easier to understand
 4. Maintain the same key points and facts as the original
 5. Use simpler words and shorter sentences in ${targetLanguageName}
+6. IMPORTANT: For items marked with "hasHtml": true, preserve all HTML tags (like <a>, <strong>, etc.) in your output
+7. Only translate the text content, NOT the HTML tags themselves
 
 OUTPUT FORMAT REQUIREMENTS:
-I will provide you with a JSON array of text items, each with an "id" and "content". 
+I will provide you with a JSON array of text items, each with an "id", "content", and possibly "hasHtml" and "htmlContent" fields. 
 You must respond with a JSON array where each item has:
 1. The original "id"
 2. A "simplified" field containing the TRANSLATED and simplified version in ${targetLanguageName}
+3. If the original had "hasHtml": true, your "simplified" field should include the preserved HTML tags
 
 Format requirements:
 - Return ONLY valid JSON without any explanations or comments
 - TRANSLATE all content into ${targetLanguageName}
 - DO NOT keep any text in the original language
 - Use simpler words and shorter sentences in ${targetLanguageName}
-- DO NOT include any markdown or HTML formatting
+- PRESERVE all HTML tags when present in the original
+- DO NOT add any additional HTML formatting not present in the original
 
 Example input:
 [
@@ -191,6 +219,7 @@ Example output:
             userMessage = `TRANSLATE THE FOLLOWING TEXT INTO ${targetLanguageName.toUpperCase()} AND SIMPLIFY IT.
 YOUR RESPONSE MUST BE IN ${targetLanguageName.toUpperCase()} ONLY.
 RETURN ONLY JSON FORMAT WITH NO EXPLANATIONS.
+PRESERVE ALL HTML TAGS IN ITEMS MARKED WITH "hasHtml": true.
 
 ${JSON.stringify(textItemsJson, null, 2)}`;
             
@@ -200,7 +229,8 @@ ${JSON.stringify(textItemsJson, null, 2)}`;
             enhancedSystemPrompt = `${systemPrompt}
 
 OUTPUT FORMAT REQUIREMENTS:
-I will provide you with a JSON array of text items, each with an "id" and "content". You must respond with a JSON array where each item has:
+I will provide you with a JSON array of text items, each with an "id", "content", and possibly "hasHtml" and "htmlContent" fields.
+You must respond with a JSON array where each item has:
 1. The original "id"
 2. A "simplified" field containing the simplified version of the content
 
@@ -210,7 +240,8 @@ Format requirements:
 - Use simpler words and shorter sentences
 - DO NOT completely rewrite the content
 - DO NOT add any new information
-- DO NOT include any markdown or HTML formatting
+- For items with "hasHtml": true, preserve all HTML tags (like <a>, <strong>, etc.) in your output
+- Only simplify the text content, NOT the HTML tags themselves
 
 Example input:
 [
@@ -228,7 +259,7 @@ Example output:
   }
 ]`;
 
-            userMessage = `Simplify these text items (preserve the JSON format in your response):\n${JSON.stringify(textItemsJson, null, 2)}`;
+            userMessage = `Simplify these text items (preserve the JSON format in your response and maintain all HTML tags when present):\n${JSON.stringify(textItemsJson, null, 2)}`;
         }
         
         // Prepare the request payload
@@ -292,37 +323,106 @@ Example output:
         // Handle non-streaming response
         console.log('Parsing JSON response...');
         const data = await response.json();
-        console.log('Received response from Together AI API:', data);
+        console.log('Raw API response data:', JSON.stringify(data).substring(0, 200) + '...');
         
-        if (data.choices && data.choices[0] && data.choices[0].message) {
-            const rawResponse = data.choices[0].message.content;
-            console.log('Raw response from API:', rawResponse.substring(0, 500) + '...');
-            
+        // Add more detailed logging to help debug
+        console.log('Response structure:', JSON.stringify({
+            hasCompletionMessage: !!data.completion_message,
+            contentType: data.completion_message?.content?.type,
+            hasText: !!data.completion_message?.content?.text,
+            textLength: data.completion_message?.content?.text?.length,
+            hasChoices: !!data.choices,
+            choicesLength: data.choices?.length
+        }));
+        
+        let rawResponse = null;
+        
+        // Handle the new Llama API response format
+        if (data.completion_message && data.completion_message.content && data.completion_message.content.text) {
+            rawResponse = data.completion_message.content.text;
+            console.log('Raw text response from Llama API:', rawResponse.substring(0, 500) + '...');
+        } 
+        // Maintain backward compatibility with the old API format
+        else if (data.choices && data.choices[0] && data.choices[0].message) {
+            rawResponse = data.choices[0].message.content;
+            console.log('Raw text response from Together AI API (legacy format):', rawResponse.substring(0, 500) + '...');
+        } else {
+            console.error('Unrecognized API response format:', data);
+            throw new Error('Unrecognized API response format');
+        }
+        
+        // Now that we have the raw text response, parse it
+        if (rawResponse) {
             // Parse the JSON response
             try {
-                // Find JSON in the response (in case there's any extra text)
-                const jsonMatch = rawResponse.match(/\[[\s\S]*\]/);
-                const jsonString = jsonMatch ? jsonMatch[0] : rawResponse;
+                // Try to clean the response if needed - some models add markdown code blocks
+                let jsonString = rawResponse;
                 
-                const simplifiedItems = JSON.parse(jsonString);
-                console.log('Parsed simplified items:', simplifiedItems);
+                // Remove any markdown code block markers if present
+                if (rawResponse.includes('```json')) {
+                    jsonString = rawResponse.replace(/```json\n?|\n?```/g, '');
+                } else if (rawResponse.includes('```')) {
+                    jsonString = rawResponse.replace(/```\n?|\n?```/g, '');
+                }
                 
-                // Create a map of id to simplified text
-                const simplificationMap = {};
-                simplifiedItems.forEach(item => {
-                    simplificationMap[item.id] = item.simplified;
-                });
-                
-                console.log('=== API CALL COMPLETED SUCCESSFULLY ===');
-                return simplificationMap;
+                // Try direct parsing first (in case the response is already clean JSON)
+                try {
+                    const directParse = JSON.parse(jsonString);
+                    console.log('Direct JSON parsing succeeded:', directParse.length);
+                    
+                    // Create a map of id to simplified text
+                    const simplificationMap = {};
+                    directParse.forEach(item => {
+                        if (item.id && item.simplified) {
+                            simplificationMap[item.id] = item.simplified;
+                        } else {
+                            console.warn('Skipping item with missing id or simplified text:', item);
+                        }
+                    });
+                    
+                    console.log('Created simplification map with keys:', Object.keys(simplificationMap));
+                    console.log('=== API CALL COMPLETED SUCCESSFULLY ===');
+                    return simplificationMap;
+                } catch (directError) {
+                    console.log('Direct parsing failed, trying to extract JSON array:', directError);
+                    
+                    // Find JSON array in the response (in case there's any extra text)
+                    const jsonMatch = jsonString.match(/\[\s*\{\s*\"id\"[\s\S]*\}\s*\]/);
+                    
+                    // If JSON array is found, extract it and parse
+                    if (jsonMatch) {
+                        console.log('Found JSON array in response:', jsonMatch[0].substring(0, 200) + '...');
+                        
+                        const extractedJson = jsonMatch[0];
+                        const simplifiedItems = JSON.parse(extractedJson);
+                        console.log('Parsed simplified items:', simplifiedItems.length);
+                        
+                        // Create a map of id to simplified text
+                        const simplificationMap = {};
+                        simplifiedItems.forEach(item => {
+                            if (item.id && item.simplified) {
+                                simplificationMap[item.id] = item.simplified;
+                            } else {
+                                console.warn('Skipping item with missing id or simplified text:', item);
+                            }
+                        });
+                        
+                        console.log('Created simplification map with keys:', Object.keys(simplificationMap));
+                        console.log('=== API CALL COMPLETED SUCCESSFULLY ===');
+                        return simplificationMap;
+                    } else {
+                        console.error('Could not find JSON array in response');
+                        throw new Error('Could not find valid JSON array in API response');
+                    }
+                }
             } catch (error) {
                 console.error('Error parsing JSON response:', error);
                 console.log('Raw response that failed to parse:', rawResponse);
-                throw new Error('Failed to parse JSON response from API');
+                throw new Error('Failed to parse JSON response from API: ' + error.message);
             }
         } else {
-            console.error('Invalid response format from API:', data);
-            throw new Error('Invalid response format from Together AI API');
+            console.error('No valid text content found in API response');
+            throw new Error('No valid text content found in API response');
         }
     } catch (error) {
         console.error('=== API CALL FAILED ===');
@@ -340,10 +440,12 @@ function getTranslatedExample(language) {
         'de': 'Wie das Gehirn denkt, ist für die moderne Neurowissenschaft immer noch ein Rätsel.',
         'it': 'Come funziona il pensiero nel cervello è ancora un misterio per la neuroscienza moderna.',
         'pt': 'Como o cérebro pensa ainda é um mistério para a neurociência moderna.',
-        'ru': 'Как работает мышление в мозге до сих пор остается загадкой для современной нейронауки.',
-        'zh': '大脑如何思考对现代神经科学来说仍然是个谜。',
-        'ja': '脳がどのように考えるかは、現代の脳科学にとってまだ謎です。',
-        'hi': 'दिमाग कैसे सोचता है यह आधुनिक न्यूरोसाइंस के लिए अभी भी एक रहस्य है।'
+        'ar': 'كيف يفكر الدماغ لا يزال لغزاً للعلوم العصبية الحديثة.',
+        'hi': 'दिमाग कैसे सोचता है यह आधुनिक न्यूरोसाइंस के लिए अभी भी एक रहस्य है।',
+        'id': 'Bagaimana otak berpikir masih menjadi misteri bagi ilmu saraf modern.',
+        'tl': 'Ang pag-iisip ng utak ay nanatiling hiwaga sa modernong agham ng utak.',
+        'th': 'วิธีการทำงานของสมองยังคงเป็นปริศนาสำหรับวิทยาศาสตร์สมองสมัยใหม่',
+        'vi': 'Cách não bộ suy nghĩ vẫn còn là điều bí ẩn đối với khoa học não bộ hiện đại.'
     };
     
     return examples[language] || examples['en'];
@@ -730,26 +832,77 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                         const simplifiedText = simplifiedBatch[nodeId];
                                         
                                         if (simplifiedText) {
+                                            // Add additional logging to debug
+                                            console.log(`Processing node ${nodeId}, simplified text:`, simplifiedText.substring(0, 100) + '...');
+                                            
                                             // Save original for restoration
                                             if (!nodeInfo.node._originalText) {
                                                 nodeInfo.node._originalText = nodeInfo.node.textContent;
                                             }
                                             
-                                            // Replace with simplified text
-                                            nodeInfo.node.textContent = simplifiedText;
+                                            // Check if this is a node with HTML content
+                                            const hasHtmlElements = nodeInfo.element && (
+                                                // Check for any HTML tags within the element
+                                                (nodeInfo.element.innerHTML && nodeInfo.element.innerHTML.includes('<')) || 
+                                                // Or check for specific common HTML elements
+                                                nodeInfo.element.getElementsByTagName('a').length > 0 || 
+                                                nodeInfo.element.getElementsByTagName('strong').length > 0 ||
+                                                nodeInfo.element.getElementsByTagName('em').length > 0 ||
+                                                nodeInfo.element.getElementsByTagName('b').length > 0 ||
+                                                nodeInfo.element.getElementsByTagName('i').length > 0 ||
+                                                nodeInfo.element.getElementsByTagName('span').length > 0 ||
+                                                nodeInfo.element.getElementsByTagName('sup').length > 0 ||
+                                                nodeInfo.element.getElementsByTagName('sub').length > 0 ||
+                                                nodeInfo.element.getElementsByTagName('cite').length > 0 ||
+                                                nodeInfo.element.getElementsByTagName('code').length > 0 ||
+                                                nodeInfo.element.getElementsByTagName('mark').length > 0
+                                            );
+                                            
+                                            // Check if the simplified text contains HTML tags
+                                            const containsHtmlTags = simplifiedText.includes('<') && simplifiedText.includes('>');
+                                            
+                                            console.log(`Node ${nodeId} - hasHtmlElements: ${hasHtmlElements}, containsHtmlTags: ${containsHtmlTags}`);
+                                            
+                                            if (hasHtmlElements || containsHtmlTags) {
+                                                // For HTML elements, replace the innerHTML instead of textContent
+                                                if (!nodeInfo.element._originalHtml) {
+                                                    nodeInfo.element._originalHtml = nodeInfo.element.innerHTML;
+                                                }
+                                                
+                                                try {
+                                                    // Replace element's innerHTML with simplified content
+                                                    nodeInfo.element.innerHTML = simplifiedText;
+                                                    console.log(`Updated innerHTML for ${nodeId}`);
+                                                    
+                                                    // Track the simplified element with HTML
+                                                    simplifiedElements.push({
+                                                        element: nodeInfo.element,
+                                                        original: nodeInfo.element._originalHtml,
+                                                        simplified: simplifiedText,
+                                                        isHtml: true
+                                                    });
+                                                } catch (e) {
+                                                    console.error(`Error updating innerHTML for ${nodeId}:`, e);
+                                                    // Fallback to textContent if innerHTML fails
+                                                    nodeInfo.node.textContent = simplifiedText.replace(/<[^>]*>/g, '');
+                                                }
+                                            } else {
+                                                // For regular text nodes, replace the textContent
+                                                nodeInfo.node.textContent = simplifiedText;
+                                                console.log(`Updated textContent for ${nodeId}`);
+                                                
+                                                // Track the simplified node
+                                                simplifiedElements.push({
+                                                    node: nodeInfo.node,
+                                                    element: nodeInfo.element,
+                                                    original: nodeInfo.node._originalText,
+                                                    simplified: simplifiedText,
+                                                    isHtml: false
+                                                });
+                                            }
                                             
                                             // Mark element as processed
                                             nodeInfo.element.setAttribute('data-simplified', 'true');
-                                            
-                                            // Track the simplified node
-                                            simplifiedElements.push({
-                                                node: nodeInfo.node,
-                                                element: nodeInfo.element,
-                                                original: nodeInfo.node._originalText,
-                                                simplified: simplifiedText
-                                            });
-                                            
-                                            console.log(`Replaced text node ${index} in batch`);
                                         } else {
                                             console.warn(`No simplified text found for node ${nodeId}`);
                                         }
@@ -1131,7 +1284,11 @@ function restoreOriginalContent() {
     
     // Restore each simplified node directly
     simplifiedElements.forEach(item => {
-        if (item.node && item.original) {
+        if (item.isHtml && item.element && item.original) {
+            // Restore HTML content
+            item.element.innerHTML = item.original;
+            console.log('Restored HTML element to original content');
+        } else if (item.node && item.original) {
             // Restore the text node to its original content
             item.node.textContent = item.original;
             console.log('Restored text node to original content');
@@ -1187,11 +1344,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Load and apply initial spacing settings
-    chrome.storage.sync.get(['lineSpacing', 'letterSpacing', 'wordSpacing'], function(result) {
-        applySpacingAdjustments(
-            result.lineSpacing || 1.5,
-            result.letterSpacing || 0,
-            result.wordSpacing || 0
-        );
-    });
+    applySpacingAdjustments(
+        1.5,  // Default line spacing
+        0,    // Default letter spacing
+        0     // Default word spacing
+    );
 });

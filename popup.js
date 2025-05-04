@@ -32,16 +32,16 @@ function initializePopup() {
     chrome.storage.sync.get(['selectedTheme'], function(result) {
         document.getElementById('themeSelector').value = result.selectedTheme || 'default';
     });
-    chrome.storage.sync.get(['lineSpacing', 'letterSpacing', 'wordSpacing'], function(result) {
-        document.getElementById('lineSpacing').value = result.lineSpacing || 1.5;
-        document.getElementById('lineSpacingValue').textContent = result.lineSpacing || 1.5;
-        
-        document.getElementById('letterSpacing').value = result.letterSpacing || 0;
-        document.getElementById('letterSpacingValue').textContent = (result.letterSpacing || 0) + 'px';
-        
-        document.getElementById('wordSpacing').value = result.wordSpacing || 0;
-        document.getElementById('wordSpacingValue').textContent = (result.wordSpacing || 0) + 'px';
-    });
+    
+    // Set default spacing values instead of loading from storage
+    document.getElementById('lineSpacing').value = 1.5;
+    document.getElementById('lineSpacingValue').textContent = 1.5;
+    
+    document.getElementById('letterSpacing').value = 0;
+    document.getElementById('letterSpacingValue').textContent = '0px';
+    
+    document.getElementById('wordSpacing').value = 0;
+    document.getElementById('wordSpacingValue').textContent = '0px';
     
     chrome.storage.sync.get(['selectedFont'], function(result) {
         const fontSelector = document.getElementById('fontSelector');
@@ -322,11 +322,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Reset to Defaults button handler
     document.getElementById('resetDefaults').addEventListener('click', function() {
         chrome.storage.sync.set({
+            simplificationLevel: '3',
+            optimizeFor: 'focusStructure',
             selectedFont: 'default',
-            selectedTheme: 'default',
-            lineSpacing: 1,
-            letterSpacing: 0,
-            wordSpacing: 0
+            selectedTheme: 'default'
         }, function() {
             // Update the UI elements
             document.getElementById('fontSelector').value = 'default';
@@ -479,20 +478,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const debouncedApplySpacing = debounce(applySpacingAdjustments, 100);
 
-    // Define a debounced function to save settings and apply spacing
+    // Define a debounced function to apply spacing without saving settings
     const debouncedSaveAndApplySpacing = debounce(function() {
         const lineSpacing = document.getElementById('lineSpacing').value;
         const letterSpacing = document.getElementById('letterSpacing').value;
         const wordSpacing = document.getElementById('wordSpacing').value;
 
-        // Save the current values to storage
-        chrome.storage.sync.set({
-            lineSpacing: lineSpacing,
-            letterSpacing: letterSpacing,
-            wordSpacing: wordSpacing
-        });
-
-        // Apply the spacing adjustments
+        // Apply the spacing adjustments without saving to storage
         applySpacingAdjustments();
     }, 200);
 

@@ -19,7 +19,7 @@
     "tabs"
   ],
   "host_permissions": [
-    "https://api.together.xyz/*",
+    "https://api.llama.com/*",
     "<all_urls>"
   ],
   "content_scripts": [
